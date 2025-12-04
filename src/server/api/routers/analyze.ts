@@ -20,12 +20,31 @@ const analyzeInputSchema = z.object({
   }),
 });
 
+// Schema for log sample analysis (optional enhancement)
+const sampleAnalysisSchema = z
+  .object({
+    timeFormat: z.string().nullable(),
+    timePrefix: z.string().nullable(),
+    lineBreaker: z.string(),
+    kvMode: z.enum(['auto', 'json', 'none']),
+    maxTimestampLookahead: z.number(),
+    detectedFields: z.array(z.string()),
+    confidence: z.enum(['high', 'medium', 'low']),
+    sampleType: z.enum(['json', 'kv', 'syslog', 'apache', 'csv', 'unknown']),
+    rawPattern: z.string().nullable(),
+    suggestedPaths: z.array(z.string()),
+    detectedVendor: z.string().nullable(),
+    suggestedSourcetype: z.string().nullable(),
+  })
+  .optional();
+
 const pathInputSchema = z.object({
   pathsText: z.string().min(1, 'Please enter at least one path'),
   siem: siemEnum.default('splunk'),
   runSensitiveScan: z.boolean().default(true),
   includeDomainsInConfigs: z.boolean().default(false),
   outputFormat: z.enum(['zip', 'txt']).default('zip'),
+  sampleAnalysis: sampleAnalysisSchema,
 });
 
 export const analyzeRouter = createTRPCRouter({
@@ -67,16 +86,26 @@ export const analyzeRouter = createTRPCRouter({
       }
 
       // Step 1: Analyze paths
-      const pathAnalysis = analyzePaths(paths);
+      let pathAnalysis = analyzePaths(paths);
+
+      // Step 1.5: Override sourcetype with detected sourcetype from sample analysis
+      if (input.sampleAnalysis?.suggestedSourcetype) {
+        pathAnalysis = pathAnalysis.map((result) => ({
+          ...result,
+          sourcetype: input.sampleAnalysis!.suggestedSourcetype!,
+          confidence: 'high',
+        }));
+      }
 
       // Step 2: Scan for sensitive data
       const sensitiveFindings = input.runSensitiveScan ? scanPathsForSensitiveData(paths) : [];
 
-      // Step 3: Generate config for selected SIEM
+      // Step 3: Generate config for selected SIEM (with optional sample analysis)
       const generatedConfig = generateConfigForSIEM(
         pathAnalysis,
         input.siem as SIEM,
-        sensitiveFindings
+        sensitiveFindings,
+        input.sampleAnalysis
       );
 
       return {

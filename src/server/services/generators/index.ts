@@ -12,6 +12,7 @@ import type {
   SIEM,
   SensitiveFinding,
   AnalyzeOptions,
+  LogSampleAnalysis,
 } from '@/types/logonboard';
 import { generateSplunkConfigs } from '../splunk-generator';
 import { generateElasticConfig } from './elastic-generator';
@@ -21,11 +22,13 @@ import { generateCriblConfig } from './cribl-generator';
 
 /**
  * Generate configuration for any supported SIEM
+ * @param sampleAnalysis - Optional log sample analysis to enhance props.conf generation
  */
 export function generateConfigForSIEM(
   results: PathAnalysisResult[],
   siem: SIEM,
-  sensitiveFindings: SensitiveFinding[]
+  sensitiveFindings: SensitiveFinding[],
+  sampleAnalysis?: LogSampleAnalysis
 ): GeneratedConfig {
   const baseConfig: GeneratedConfig = {
     inputsConf: '',
@@ -53,7 +56,12 @@ export function generateConfigForSIEM(
 
   switch (siem) {
     case 'splunk': {
-      const splunkConfigs = generateSplunkConfigs(results, sensitiveFindings, defaultOptions);
+      const splunkConfigs = generateSplunkConfigs(
+        results,
+        sensitiveFindings,
+        defaultOptions,
+        sampleAnalysis
+      );
       return {
         ...baseConfig,
         inputsConf: splunkConfigs.inputsConf,

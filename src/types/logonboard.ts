@@ -142,3 +142,19 @@ export interface AnalyzeResponse {
   generatedConfig: GeneratedConfig;
   downloadUrl?: string;
 }
+
+// Log sample analysis result - used to enhance props.conf generation
+export interface LogSampleAnalysis {
+  timeFormat: string | null;
+  timePrefix: string | null;
+  lineBreaker: string;
+  kvMode: 'auto' | 'json' | 'none';
+  maxTimestampLookahead: number;
+  detectedFields: string[];
+  confidence: 'high' | 'medium' | 'low';
+  sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
+  rawPattern: string | null;
+  suggestedPaths: string[];
+  detectedVendor: string | null;
+  suggestedSourcetype: string | null;
+}

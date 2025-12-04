@@ -34,6 +34,9 @@ interface LogSampleAnalysis {
   confidence: 'high' | 'medium' | 'low';
   sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
   rawPattern: string | null;
+  suggestedPaths: string[];
+  detectedVendor: string | null;
+  suggestedSourcetype: string | null;
 }
 
 export default function AnalyzePage() {
@@ -64,6 +67,16 @@ export default function AnalyzePage() {
     }
   };
 
+  const handleUseSuggestedPath = (path: string) => {
+    setPathsText(path);
+  };
+
+  const handleUseAllSuggestedPaths = () => {
+    if (sampleAnalysis?.suggestedPaths) {
+      setPathsText(sampleAnalysis.suggestedPaths.join('\n'));
+    }
+  };
+
   const handleAnalyze = () => {
     analyzeMutation.mutate({
       pathsText,
@@ -71,6 +84,7 @@ export default function AnalyzePage() {
       runSensitiveScan,
       includeDomainsInConfigs: false,
       outputFormat,
+      sampleAnalysis: sampleAnalysis ?? undefined,
     });
   };
 
@@ -296,6 +310,58 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
                           </div>
                         )}
                       </div>
+
+                      {/* Detected Vendor and Suggested Paths */}
+                      {sampleAnalysis.detectedVendor && (
+                        <div className="pt-2 border-t border-green-300 dark:border-green-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <svg
+                              className="w-4 h-4 text-green-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                              Detected: {sampleAnalysis.detectedVendor}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {sampleAnalysis.suggestedPaths &&
+                        sampleAnalysis.suggestedPaths.length > 0 && (
+                          <div className="pt-2">
+                            <p className="text-xs font-medium text-green-800 dark:text-green-200 mb-2">
+                              Suggested log paths:
+                            </p>
+                            <div className="space-y-1">
+                              {sampleAnalysis.suggestedPaths.map((path, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleUseSuggestedPath(path)}
+                                  className="w-full text-left px-2 py-1 text-xs font-mono bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 rounded border border-green-300 dark:border-green-700 transition-colors"
+                                >
+                                  {path}
+                                </button>
+                              ))}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={handleUseAllSuggestedPaths}
+                              className="mt-2 w-full"
+                            >
+                              Use All Suggested Paths
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>

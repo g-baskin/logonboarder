@@ -1,0 +1,125 @@
+{
+  "templates": {
+    "access_combined": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%d/%b/%Y:%H:%M:%S %z",
+      "TIME_PREFIX": "\\[",
+      "MAX_TIMESTAMP_LOOKAHEAD": "32",
+      "KV_MODE": "none",
+      "TRUNCATE": "999999",
+      "category": "Web Access Logs"
+    },
+    "apache:error": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%a %b %d %H:%M:%S.%6N %Y",
+      "TIME_PREFIX": "^\\[",
+      "MAX_TIMESTAMP_LOOKAHEAD": "40",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Apache Error Logs"
+    },
+    "syslog": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%b %d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "20",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "System Logs"
+    },
+    "linux_secure": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%b %d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "20",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Linux Security Logs"
+    },
+    "linux:audit": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%s",
+      "TIME_PREFIX": "msg=audit\\(",
+      "MAX_TIMESTAMP_LOOKAHEAD": "20",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Linux Audit Logs"
+    },
+    "WinEventLog:Security": {
+      "SHOULD_LINEMERGE": "true",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "30",
+      "KV_MODE": "xml",
+      "TRUNCATE": "999999",
+      "category": "Windows Security Events"
+    },
+    "nginx:plus:access": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%d/%b/%Y:%H:%M:%S %z",
+      "TIME_PREFIX": "\\[",
+      "MAX_TIMESTAMP_LOOKAHEAD": "32",
+      "KV_MODE": "none",
+      "TRUNCATE": "999999",
+      "category": "Nginx Access Logs"
+    },
+    "nginx:plus:error": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y/%m/%d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "25",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Nginx Error Logs"
+    },
+    "log4j": {
+      "SHOULD_LINEMERGE": "true",
+      "LINE_BREAKER": "([\\r\\n]+)(?=\\d{4}-\\d{2}-\\d{2})",
+      "TIME_FORMAT": "%Y-%m-%d %H:%M:%S,%3N",
+      "MAX_TIMESTAMP_LOOKAHEAD": "30",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Java Application Logs"
+    },
+    "mysql:error": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%6N%z",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "MySQL Error Logs"
+    },
+    "postgresql": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "25",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "PostgreSQL Logs"
+    },
+    "docker": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%9NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "Docker Container Logs"
+    },
+    "_default": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "<NEEDS_SAMPLE>",
+      "MAX_TIMESTAMP_LOOKAHEAD": "128",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Unknown - Requires Manual Review"
+    }
+  }
+}

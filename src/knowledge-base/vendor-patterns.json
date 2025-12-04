@@ -1,0 +1,107 @@
+{
+  "vendors": {
+    "apache": {
+      "paths": ["/var/log/apache2", "/var/log/httpd", "/usr/local/apache2/logs"],
+      "files": ["access.log", "error.log", "access_log", "error_log"],
+      "sourcetypes": {
+        "access": "access_combined",
+        "error": "apache:error"
+      }
+    },
+    "nginx": {
+      "paths": ["/var/log/nginx", "/usr/local/nginx/logs"],
+      "files": ["access.log", "error.log"],
+      "sourcetypes": {
+        "access": "nginx:plus:access",
+        "error": "nginx:plus:error"
+      }
+    },
+    "tomcat": {
+      "paths": [
+        "/var/log/tomcat",
+        "/opt/tomcat/logs",
+        "C:\\Program Files\\Apache Software Foundation\\Tomcat"
+      ],
+      "files": ["catalina.out", "localhost_access_log", "localhost.log"],
+      "sourcetypes": {
+        "catalina": "catalina",
+        "access": "tomcat:access"
+      }
+    },
+    "mysql": {
+      "paths": ["/var/log/mysql", "/var/lib/mysql"],
+      "files": ["mysqld.log", "error.log", "mysql-slow.log"],
+      "sourcetypes": {
+        "error": "mysql:error",
+        "slow": "mysql:slowquery"
+      }
+    },
+    "postgresql": {
+      "paths": ["/var/log/postgresql", "/var/lib/pgsql/data/log"],
+      "files": ["postgresql.log", "postgresql-*.log"],
+      "sourcetypes": {
+        "default": "postgresql"
+      }
+    },
+    "mongodb": {
+      "paths": ["/var/log/mongodb"],
+      "files": ["mongod.log"],
+      "sourcetypes": {
+        "default": "mongodb"
+      }
+    },
+    "elasticsearch": {
+      "paths": ["/var/log/elasticsearch"],
+      "files": ["elasticsearch.log", "gc.log"],
+      "sourcetypes": {
+        "default": "elasticsearch"
+      }
+    },
+    "docker": {
+      "paths": ["/var/lib/docker/containers"],
+      "files": ["*-json.log"],
+      "sourcetypes": {
+        "default": "docker"
+      }
+    },
+    "kubernetes": {
+      "paths": ["/var/log/containers", "/var/log/pods"],
+      "files": ["*.log"],
+      "sourcetypes": {
+        "default": "kube:container:logs"
+      }
+    },
+    "windows": {
+      "paths": ["C:\\Windows\\System32\\winevt\\Logs"],
+      "files": ["Security.evtx", "System.evtx", "Application.evtx"],
+      "sourcetypes": {
+        "security": "WinEventLog:Security",
+        "system": "WinEventLog:System",
+        "application": "WinEventLog:Application"
+      }
+    },
+    "iis": {
+      "paths": ["C:\\inetpub\\logs\\LogFiles"],
+      "files": ["u_ex*.log"],
+      "sourcetypes": {
+        "default": "iis"
+      }
+    },
+    "paloalto": {
+      "paths": [],
+      "files": ["traffic.log", "threat.log", "system.log"],
+      "sourcetypes": {
+        "traffic": "pan:traffic",
+        "threat": "pan:threat",
+        "system": "pan:system"
+      }
+    },
+    "cisco_asa": {
+      "paths": [],
+      "files": [],
+      "sourcetypes": {
+        "default": "cisco:asa"
+      }
+    }
+  }
+}

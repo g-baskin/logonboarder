@@ -1,0 +1,76 @@
+{
+  "filename_patterns": {
+    "access.log": { "sourcetype": "access_combined", "index": "web", "category": "web" },
+    "access_log": { "sourcetype": "access_combined", "index": "web", "category": "web" },
+    "error.log": { "sourcetype": "apache:error", "index": "web", "category": "web" },
+    "error_log": { "sourcetype": "apache:error", "index": "web", "category": "web" },
+    "security.log": {
+      "sourcetype": "WinEventLog:Security",
+      "index": "wineventlog",
+      "category": "security"
+    },
+    "security": {
+      "sourcetype": "WinEventLog:Security",
+      "index": "wineventlog",
+      "category": "security"
+    },
+    "system.log": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "syslog": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "messages": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "auth.log": { "sourcetype": "linux_secure", "index": "os", "category": "security" },
+    "secure": { "sourcetype": "linux_secure", "index": "os", "category": "security" },
+    "audit.log": { "sourcetype": "linux:audit", "index": "os", "category": "security" },
+    "kern.log": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "daemon.log": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "cron.log": { "sourcetype": "syslog", "index": "os", "category": "system" },
+    "maillog": { "sourcetype": "syslog", "index": "email", "category": "email" },
+    "nginx-access.log": { "sourcetype": "nginx:plus:access", "index": "web", "category": "web" },
+    "nginx-error.log": { "sourcetype": "nginx:plus:error", "index": "web", "category": "web" },
+    "catalina.out": { "sourcetype": "catalina", "index": "app", "category": "application" },
+    "localhost_access_log": { "sourcetype": "tomcat:access", "index": "web", "category": "web" },
+    "application.log": { "sourcetype": "log4j", "index": "app", "category": "application" },
+    "app.log": { "sourcetype": "log4j", "index": "app", "category": "application" },
+    "debug.log": { "sourcetype": "log4j", "index": "app", "category": "application" },
+    "mysqld.log": { "sourcetype": "mysql:error", "index": "db", "category": "database" },
+    "mysql-slow.log": { "sourcetype": "mysql:slowquery", "index": "db", "category": "database" },
+    "postgresql.log": { "sourcetype": "postgresql", "index": "db", "category": "database" },
+    "mongod.log": { "sourcetype": "mongodb", "index": "db", "category": "database" },
+    "redis.log": { "sourcetype": "redis", "index": "db", "category": "database" },
+    "elasticsearch.log": { "sourcetype": "elasticsearch", "index": "db", "category": "database" },
+    "docker.log": { "sourcetype": "docker", "index": "container", "category": "container" },
+    "kubernetes.log": {
+      "sourcetype": "kube:container:logs",
+      "index": "container",
+      "category": "container"
+    },
+    "firewall.log": { "sourcetype": "pan:traffic", "index": "network", "category": "network" },
+    "vpn.log": { "sourcetype": "vpn", "index": "network", "category": "network" },
+    "dns.log": { "sourcetype": "dns", "index": "network", "category": "network" },
+    "dhcp.log": { "sourcetype": "dhcp", "index": "network", "category": "network" }
+  },
+  "directory_patterns": {
+    "/var/log/apache2": { "sourcetype": "access_combined", "index": "web", "category": "web" },
+    "/var/log/httpd": { "sourcetype": "access_combined", "index": "web", "category": "web" },
+    "/var/log/nginx": { "sourcetype": "nginx:plus:access", "index": "web", "category": "web" },
+    "/var/log/audit": { "sourcetype": "linux:audit", "index": "os", "category": "security" },
+    "/var/log/mysql": { "sourcetype": "mysql:error", "index": "db", "category": "database" },
+    "/var/log/postgresql": { "sourcetype": "postgresql", "index": "db", "category": "database" },
+    "/var/log/tomcat": { "sourcetype": "catalina", "index": "app", "category": "application" },
+    "/var/log/docker": { "sourcetype": "docker", "index": "container", "category": "container" },
+    "C:\\Windows\\System32\\winevt\\Logs": {
+      "sourcetype": "WinEventLog",
+      "index": "wineventlog",
+      "category": "security"
+    },
+    "C:\\inetpub\\logs": { "sourcetype": "iis", "index": "web", "category": "web" },
+    "C:\\Program Files\\Microsoft SQL Server": {
+      "sourcetype": "mssql",
+      "index": "db",
+      "category": "database"
+    }
+  },
+  "extension_patterns": {
+    ".evtx": { "sourcetype": "WinEventLog", "index": "wineventlog", "category": "security" },
+    ".evt": { "sourcetype": "WinEventLog", "index": "wineventlog", "category": "security" }
+  }
+}

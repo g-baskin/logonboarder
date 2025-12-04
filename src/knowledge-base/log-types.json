@@ -1,0 +1,823 @@
+{
+  "$schema": "./schemas/log-types.schema.json",
+  "$meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-12-04",
+    "sources": [
+      "https://splunkbase.splunk.com/app/1621",
+      "https://www.elastic.co/guide/en/beats/filebeat/current/exported-fields-ecs.html",
+      "https://learn.microsoft.com/en-us/azure/sentinel/data-connectors-reference",
+      "https://www.ibm.com/docs/en/dsm",
+      "https://docs.cribl.io/stream/packs/"
+    ]
+  },
+  "logTypes": {
+    "apache_access": {
+      "category": "web",
+      "description": "Apache HTTP Server access logs",
+      "filenames": ["access.log", "access_log", "httpd-access.log"],
+      "directories": ["/var/log/apache2", "/var/log/httpd", "/usr/local/apache2/logs"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "access_combined",
+          "index": "web",
+          "app": "Splunk_TA_apache"
+        },
+        "elastic": {
+          "module": "apache",
+          "fileset": "access",
+          "index": "logs-apache.access-*"
+        },
+        "sentinel": {
+          "table": "ApacheHTTPServer_CL",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Apache HTTP Server",
+          "dsm": "Apache"
+        },
+        "cribl": {
+          "sourcetype": "apache:access",
+          "pack": "apache"
+        }
+      }
+    },
+    "apache_error": {
+      "category": "web",
+      "description": "Apache HTTP Server error logs",
+      "filenames": ["error.log", "error_log", "httpd-error.log"],
+      "directories": ["/var/log/apache2", "/var/log/httpd"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "apache:error",
+          "index": "web",
+          "app": "Splunk_TA_apache"
+        },
+        "elastic": {
+          "module": "apache",
+          "fileset": "error",
+          "index": "logs-apache.error-*"
+        },
+        "sentinel": {
+          "table": "ApacheHTTPServer_CL",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Apache HTTP Server",
+          "dsm": "Apache"
+        },
+        "cribl": {
+          "sourcetype": "apache:error",
+          "pack": "apache"
+        }
+      }
+    },
+    "nginx_access": {
+      "category": "web",
+      "description": "NGINX access logs",
+      "filenames": ["access.log", "nginx-access.log"],
+      "directories": ["/var/log/nginx", "/usr/local/nginx/logs"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "nginx:plus:access",
+          "index": "web",
+          "app": "Splunk_TA_nginx"
+        },
+        "elastic": {
+          "module": "nginx",
+          "fileset": "access",
+          "index": "logs-nginx.access-*"
+        },
+        "sentinel": {
+          "table": "NGINXHTTPServer_CL",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "NGINX HTTP Server",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "nginx:access",
+          "pack": "nginx"
+        }
+      }
+    },
+    "nginx_error": {
+      "category": "web",
+      "description": "NGINX error logs",
+      "filenames": ["error.log", "nginx-error.log"],
+      "directories": ["/var/log/nginx"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "nginx:plus:error",
+          "index": "web",
+          "app": "Splunk_TA_nginx"
+        },
+        "elastic": {
+          "module": "nginx",
+          "fileset": "error",
+          "index": "logs-nginx.error-*"
+        },
+        "sentinel": {
+          "table": "NGINXHTTPServer_CL",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "NGINX HTTP Server",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "nginx:error",
+          "pack": "nginx"
+        }
+      }
+    },
+    "syslog": {
+      "category": "os",
+      "description": "Linux syslog messages",
+      "filenames": ["syslog", "messages", "system.log"],
+      "directories": ["/var/log"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "syslog",
+          "index": "os",
+          "app": "Splunk_TA_nix"
+        },
+        "elastic": {
+          "module": "system",
+          "fileset": "syslog",
+          "index": "logs-system.syslog-*"
+        },
+        "sentinel": {
+          "table": "Syslog",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Linux OS",
+          "dsm": "Linux OS"
+        },
+        "cribl": {
+          "sourcetype": "syslog",
+          "pack": "syslog"
+        }
+      }
+    },
+    "linux_auth": {
+      "category": "security",
+      "description": "Linux authentication logs",
+      "filenames": ["auth.log", "secure"],
+      "directories": ["/var/log"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "linux_secure",
+          "index": "os",
+          "app": "Splunk_TA_nix"
+        },
+        "elastic": {
+          "module": "system",
+          "fileset": "auth",
+          "index": "logs-system.auth-*"
+        },
+        "sentinel": {
+          "table": "Syslog",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Linux OS",
+          "dsm": "Linux OS"
+        },
+        "cribl": {
+          "sourcetype": "linux:auth",
+          "pack": "linux"
+        }
+      }
+    },
+    "linux_audit": {
+      "category": "security",
+      "description": "Linux audit daemon logs",
+      "filenames": ["audit.log"],
+      "directories": ["/var/log/audit"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "linux:audit",
+          "index": "os",
+          "app": "Splunk_TA_nix"
+        },
+        "elastic": {
+          "module": "auditd",
+          "fileset": "log",
+          "index": "logs-auditd.log-*"
+        },
+        "sentinel": {
+          "table": "AuditLogs",
+          "connector": "Syslog via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Linux Audit",
+          "dsm": "Linux OS"
+        },
+        "cribl": {
+          "sourcetype": "linux:audit",
+          "pack": "linux"
+        }
+      }
+    },
+    "windows_security": {
+      "category": "security",
+      "description": "Windows Security Event Log",
+      "filenames": ["Security.evtx", "security"],
+      "directories": ["C:\\Windows\\System32\\winevt\\Logs"],
+      "extensions": [".evtx"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "WinEventLog:Security",
+          "index": "wineventlog",
+          "app": "Splunk_TA_windows"
+        },
+        "elastic": {
+          "module": "winlog",
+          "channel": "Security",
+          "index": "logs-windows.security-*"
+        },
+        "sentinel": {
+          "table": "SecurityEvent",
+          "connector": "Windows Security Events via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Microsoft Windows Security Event Log",
+          "dsm": "Microsoft Windows"
+        },
+        "cribl": {
+          "sourcetype": "WinEventLog:Security",
+          "pack": "windows"
+        }
+      }
+    },
+    "windows_system": {
+      "category": "os",
+      "description": "Windows System Event Log",
+      "filenames": ["System.evtx", "system"],
+      "directories": ["C:\\Windows\\System32\\winevt\\Logs"],
+      "extensions": [".evtx"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "WinEventLog:System",
+          "index": "wineventlog",
+          "app": "Splunk_TA_windows"
+        },
+        "elastic": {
+          "module": "winlog",
+          "channel": "System",
+          "index": "logs-windows.system-*"
+        },
+        "sentinel": {
+          "table": "Event",
+          "connector": "Windows Forwarded Events"
+        },
+        "qradar": {
+          "logSourceType": "Microsoft Windows Security Event Log",
+          "dsm": "Microsoft Windows"
+        },
+        "cribl": {
+          "sourcetype": "WinEventLog:System",
+          "pack": "windows"
+        }
+      }
+    },
+    "windows_application": {
+      "category": "application",
+      "description": "Windows Application Event Log",
+      "filenames": ["Application.evtx", "application"],
+      "directories": ["C:\\Windows\\System32\\winevt\\Logs"],
+      "extensions": [".evtx"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "WinEventLog:Application",
+          "index": "wineventlog",
+          "app": "Splunk_TA_windows"
+        },
+        "elastic": {
+          "module": "winlog",
+          "channel": "Application",
+          "index": "logs-windows.application-*"
+        },
+        "sentinel": {
+          "table": "Event",
+          "connector": "Windows Forwarded Events"
+        },
+        "qradar": {
+          "logSourceType": "Microsoft Windows Security Event Log",
+          "dsm": "Microsoft Windows"
+        },
+        "cribl": {
+          "sourcetype": "WinEventLog:Application",
+          "pack": "windows"
+        }
+      }
+    },
+    "iis": {
+      "category": "web",
+      "description": "Microsoft IIS Web Server logs",
+      "filenames": ["u_ex*.log"],
+      "directories": ["C:\\inetpub\\logs\\LogFiles"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "iis",
+          "index": "web",
+          "app": "Splunk_TA_microsoft_iis"
+        },
+        "elastic": {
+          "module": "iis",
+          "fileset": "access",
+          "index": "logs-iis.access-*"
+        },
+        "sentinel": {
+          "table": "W3CIISLog",
+          "connector": "IIS Logs"
+        },
+        "qradar": {
+          "logSourceType": "Microsoft IIS",
+          "dsm": "Microsoft IIS"
+        },
+        "cribl": {
+          "sourcetype": "iis",
+          "pack": "microsoft"
+        }
+      }
+    },
+    "mysql_error": {
+      "category": "database",
+      "description": "MySQL error logs",
+      "filenames": ["mysqld.log", "error.log", "mysql-error.log"],
+      "directories": ["/var/log/mysql", "/var/lib/mysql"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "mysql:error",
+          "index": "db",
+          "app": "Splunk_TA_mysql"
+        },
+        "elastic": {
+          "module": "mysql",
+          "fileset": "error",
+          "index": "logs-mysql.error-*"
+        },
+        "sentinel": {
+          "table": "MySQL_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "MySQL",
+          "dsm": "MySQL"
+        },
+        "cribl": {
+          "sourcetype": "mysql:error",
+          "pack": "databases"
+        }
+      }
+    },
+    "mysql_slowquery": {
+      "category": "database",
+      "description": "MySQL slow query logs",
+      "filenames": ["mysql-slow.log", "slow.log", "slow-query.log"],
+      "directories": ["/var/log/mysql", "/var/lib/mysql"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "mysql:slowquery",
+          "index": "db",
+          "app": "Splunk_TA_mysql"
+        },
+        "elastic": {
+          "module": "mysql",
+          "fileset": "slowlog",
+          "index": "logs-mysql.slowlog-*"
+        },
+        "sentinel": {
+          "table": "MySQL_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "MySQL",
+          "dsm": "MySQL"
+        },
+        "cribl": {
+          "sourcetype": "mysql:slowquery",
+          "pack": "databases"
+        }
+      }
+    },
+    "postgresql": {
+      "category": "database",
+      "description": "PostgreSQL logs",
+      "filenames": ["postgresql.log", "postgresql-*.log"],
+      "directories": ["/var/log/postgresql", "/var/lib/pgsql/data/log"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "postgresql",
+          "index": "db",
+          "app": "Splunk_TA_postgresql"
+        },
+        "elastic": {
+          "module": "postgresql",
+          "fileset": "log",
+          "index": "logs-postgresql.log-*"
+        },
+        "sentinel": {
+          "table": "PostgreSQL_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "PostgreSQL",
+          "dsm": "PostgreSQL"
+        },
+        "cribl": {
+          "sourcetype": "postgresql",
+          "pack": "databases"
+        }
+      }
+    },
+    "mongodb": {
+      "category": "database",
+      "description": "MongoDB logs",
+      "filenames": ["mongod.log"],
+      "directories": ["/var/log/mongodb"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "mongodb",
+          "index": "db",
+          "app": "Splunk_TA_mongodb"
+        },
+        "elastic": {
+          "module": "mongodb",
+          "fileset": "log",
+          "index": "logs-mongodb.log-*"
+        },
+        "sentinel": {
+          "table": "MongoDB_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "MongoDB",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "mongodb",
+          "pack": "databases"
+        }
+      }
+    },
+    "docker": {
+      "category": "container",
+      "description": "Docker container logs",
+      "filenames": ["*-json.log"],
+      "directories": ["/var/lib/docker/containers"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "docker",
+          "index": "container",
+          "app": "Splunk_TA_docker"
+        },
+        "elastic": {
+          "module": "docker",
+          "input": "container",
+          "index": "logs-docker.*"
+        },
+        "sentinel": {
+          "table": "ContainerLog",
+          "connector": "Container Insights"
+        },
+        "qradar": {
+          "logSourceType": "Docker",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "docker:json",
+          "pack": "containers"
+        }
+      }
+    },
+    "kubernetes": {
+      "category": "container",
+      "description": "Kubernetes container/pod logs",
+      "filenames": ["*.log"],
+      "directories": ["/var/log/containers", "/var/log/pods"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "kube:container:logs",
+          "index": "container",
+          "app": "Splunk_TA_kubernetes"
+        },
+        "elastic": {
+          "module": "kubernetes",
+          "input": "container_logs",
+          "index": "logs-kubernetes.*"
+        },
+        "sentinel": {
+          "table": "ContainerLog",
+          "connector": "Azure Kubernetes Service (AKS)"
+        },
+        "qradar": {
+          "logSourceType": "Kubernetes",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "kube:logs",
+          "pack": "kubernetes"
+        }
+      }
+    },
+    "paloalto_traffic": {
+      "category": "network",
+      "description": "Palo Alto Networks firewall traffic logs",
+      "filenames": ["traffic.log"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "pan:traffic",
+          "index": "network",
+          "app": "Splunk_TA_paloalto"
+        },
+        "elastic": {
+          "module": "panw",
+          "fileset": "panos",
+          "index": "logs-panw.panos-*"
+        },
+        "sentinel": {
+          "table": "CommonSecurityLog",
+          "connector": "Palo Alto Networks (Firewall)"
+        },
+        "qradar": {
+          "logSourceType": "Palo Alto PA Series",
+          "dsm": "PaloAltoNetworksPASeries"
+        },
+        "cribl": {
+          "sourcetype": "pan:traffic",
+          "pack": "palo_alto"
+        }
+      }
+    },
+    "paloalto_threat": {
+      "category": "security",
+      "description": "Palo Alto Networks firewall threat logs",
+      "filenames": ["threat.log"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "pan:threat",
+          "index": "network",
+          "app": "Splunk_TA_paloalto"
+        },
+        "elastic": {
+          "module": "panw",
+          "fileset": "panos",
+          "index": "logs-panw.panos-*"
+        },
+        "sentinel": {
+          "table": "CommonSecurityLog",
+          "connector": "Palo Alto Networks (Firewall)"
+        },
+        "qradar": {
+          "logSourceType": "Palo Alto PA Series",
+          "dsm": "PaloAltoNetworksPASeries"
+        },
+        "cribl": {
+          "sourcetype": "pan:threat",
+          "pack": "palo_alto"
+        }
+      }
+    },
+    "cisco_asa": {
+      "category": "network",
+      "description": "Cisco ASA firewall logs",
+      "filenames": [],
+      "siem": {
+        "splunk": {
+          "sourcetype": "cisco:asa",
+          "index": "network",
+          "app": "Splunk_TA_cisco-asa"
+        },
+        "elastic": {
+          "module": "cisco",
+          "fileset": "asa",
+          "index": "logs-cisco.asa-*"
+        },
+        "sentinel": {
+          "table": "CommonSecurityLog",
+          "connector": "Cisco ASA"
+        },
+        "qradar": {
+          "logSourceType": "Cisco Adaptive Security Appliance",
+          "dsm": "CiscoAdaptiveSecurityAppliance"
+        },
+        "cribl": {
+          "sourcetype": "cisco:asa",
+          "pack": "cisco"
+        }
+      }
+    },
+    "aws_cloudtrail": {
+      "category": "cloud",
+      "description": "AWS CloudTrail audit logs",
+      "filenames": ["*.json"],
+      "directories": ["cloudtrail"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "aws:cloudtrail",
+          "index": "aws",
+          "app": "Splunk_TA_aws"
+        },
+        "elastic": {
+          "module": "aws",
+          "fileset": "cloudtrail",
+          "index": "logs-aws.cloudtrail-*"
+        },
+        "sentinel": {
+          "table": "AWSCloudTrail",
+          "connector": "Amazon Web Services S3"
+        },
+        "qradar": {
+          "logSourceType": "Amazon AWS CloudTrail",
+          "dsm": "AmazonAWSCloudTrail"
+        },
+        "cribl": {
+          "sourcetype": "aws:cloudtrail",
+          "pack": "aws"
+        }
+      }
+    },
+    "aws_vpc_flow": {
+      "category": "cloud",
+      "description": "AWS VPC Flow Logs",
+      "filenames": [],
+      "siem": {
+        "splunk": {
+          "sourcetype": "aws:cloudwatchlogs:vpcflow",
+          "index": "aws",
+          "app": "Splunk_TA_aws"
+        },
+        "elastic": {
+          "module": "aws",
+          "fileset": "vpcflow",
+          "index": "logs-aws.vpcflow-*"
+        },
+        "sentinel": {
+          "table": "AWSVPCFlow",
+          "connector": "Amazon Web Services S3"
+        },
+        "qradar": {
+          "logSourceType": "Amazon AWS VPC Flow",
+          "dsm": "AmazonAWSVPCFlow"
+        },
+        "cribl": {
+          "sourcetype": "aws:vpcflow",
+          "pack": "aws"
+        }
+      }
+    },
+    "azure_activity": {
+      "category": "cloud",
+      "description": "Azure Activity Logs",
+      "filenames": [],
+      "siem": {
+        "splunk": {
+          "sourcetype": "azure:activity",
+          "index": "azure",
+          "app": "Splunk_TA_azure"
+        },
+        "elastic": {
+          "module": "azure",
+          "fileset": "activitylogs",
+          "index": "logs-azure.activitylogs-*"
+        },
+        "sentinel": {
+          "table": "AzureActivity",
+          "connector": "Azure Activity"
+        },
+        "qradar": {
+          "logSourceType": "Microsoft Azure",
+          "dsm": "MicrosoftAzure"
+        },
+        "cribl": {
+          "sourcetype": "azure:activity",
+          "pack": "azure"
+        }
+      }
+    },
+    "gcp_audit": {
+      "category": "cloud",
+      "description": "Google Cloud Platform audit logs",
+      "filenames": [],
+      "siem": {
+        "splunk": {
+          "sourcetype": "google:gcp:pubsub:audit",
+          "index": "gcp",
+          "app": "Splunk_TA_google-cloudplatform"
+        },
+        "elastic": {
+          "module": "gcp",
+          "fileset": "audit",
+          "index": "logs-gcp.audit-*"
+        },
+        "sentinel": {
+          "table": "GCPAuditLogs",
+          "connector": "Google Cloud Platform"
+        },
+        "qradar": {
+          "logSourceType": "Google Cloud Platform",
+          "dsm": "GoogleCloudPlatform"
+        },
+        "cribl": {
+          "sourcetype": "gcp:audit",
+          "pack": "gcp"
+        }
+      }
+    },
+    "tomcat_catalina": {
+      "category": "application",
+      "description": "Apache Tomcat Catalina logs",
+      "filenames": ["catalina.out", "catalina.log"],
+      "directories": ["/var/log/tomcat", "/opt/tomcat/logs"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "catalina",
+          "index": "app",
+          "app": "Splunk_TA_tomcat"
+        },
+        "elastic": {
+          "module": "tomcat",
+          "fileset": "catalina",
+          "index": "logs-tomcat.catalina-*"
+        },
+        "sentinel": {
+          "table": "Tomcat_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Apache Tomcat",
+          "dsm": "ApacheTomcat"
+        },
+        "cribl": {
+          "sourcetype": "tomcat:catalina",
+          "pack": "java"
+        }
+      }
+    },
+    "redis": {
+      "category": "database",
+      "description": "Redis server logs",
+      "filenames": ["redis.log", "redis-server.log"],
+      "directories": ["/var/log/redis"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "redis",
+          "index": "db",
+          "app": "Splunk_TA_redis"
+        },
+        "elastic": {
+          "module": "redis",
+          "fileset": "log",
+          "index": "logs-redis.log-*"
+        },
+        "sentinel": {
+          "table": "Redis_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Redis",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "redis",
+          "pack": "databases"
+        }
+      }
+    },
+    "elasticsearch_logs": {
+      "category": "database",
+      "description": "Elasticsearch server logs",
+      "filenames": ["elasticsearch.log", "gc.log"],
+      "directories": ["/var/log/elasticsearch"],
+      "siem": {
+        "splunk": {
+          "sourcetype": "elasticsearch",
+          "index": "db",
+          "app": "Splunk_TA_elasticsearch"
+        },
+        "elastic": {
+          "module": "elasticsearch",
+          "fileset": "server",
+          "index": "logs-elasticsearch.server-*"
+        },
+        "sentinel": {
+          "table": "Elasticsearch_CL",
+          "connector": "Custom Logs via AMA"
+        },
+        "qradar": {
+          "logSourceType": "Elasticsearch",
+          "dsm": "Universal LEEF"
+        },
+        "cribl": {
+          "sourcetype": "elasticsearch",
+          "pack": "elastic"
+        }
+      }
+    }
+  }
+}

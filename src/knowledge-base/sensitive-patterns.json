@@ -1,0 +1,76 @@
+{
+  "patterns": {
+    "domain": {
+      "regex": "\\b[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.([a-zA-Z]{2,})(\\.[a-zA-Z]{2,})?\\b",
+      "description": "Domain names",
+      "risk_level": "medium",
+      "mask_format": "[DOMAIN_REDACTED]"
+    },
+    "gov_domain": {
+      "regex": "\\b[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.gov\\b",
+      "description": "Government domains (.gov)",
+      "risk_level": "high",
+      "mask_format": "[GOV_DOMAIN_REDACTED]"
+    },
+    "mil_domain": {
+      "regex": "\\b[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.mil\\b",
+      "description": "Military domains (.mil)",
+      "risk_level": "critical",
+      "mask_format": "[MIL_DOMAIN_REDACTED]"
+    },
+    "ipv4": {
+      "regex": "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b",
+      "description": "IPv4 addresses",
+      "risk_level": "medium",
+      "mask_format": "[IP_REDACTED]"
+    },
+    "ipv6": {
+      "regex": "\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b",
+      "description": "IPv6 addresses",
+      "risk_level": "medium",
+      "mask_format": "[IP_REDACTED]"
+    },
+    "email": {
+      "regex": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+      "description": "Email addresses",
+      "risk_level": "high",
+      "mask_format": "[EMAIL_REDACTED]"
+    },
+    "ssn": {
+      "regex": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+      "description": "Social Security Numbers",
+      "risk_level": "critical",
+      "mask_format": "###-##-[LAST4]"
+    },
+    "credit_card": {
+      "regex": "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b",
+      "description": "Credit card numbers",
+      "risk_level": "critical",
+      "mask_format": "[CC_REDACTED]"
+    },
+    "phone_us": {
+      "regex": "\\b(?:\\+1[-.]?)?\\(?[0-9]{3}\\)?[-.]?[0-9]{3}[-.]?[0-9]{4}\\b",
+      "description": "US phone numbers",
+      "risk_level": "medium",
+      "mask_format": "[PHONE_REDACTED]"
+    },
+    "aws_key": {
+      "regex": "\\b(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\\b",
+      "description": "AWS Access Key ID",
+      "risk_level": "critical",
+      "mask_format": "[AWS_KEY_REDACTED]"
+    },
+    "private_key": {
+      "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+      "description": "Private key headers",
+      "risk_level": "critical",
+      "mask_format": "[PRIVATE_KEY_REDACTED]"
+    }
+  },
+  "risk_levels": {
+    "low": { "action": "log", "color": "green" },
+    "medium": { "action": "warn", "color": "yellow" },
+    "high": { "action": "mask_recommended", "color": "orange" },
+    "critical": { "action": "mask_required", "color": "red" }
+  }
+}

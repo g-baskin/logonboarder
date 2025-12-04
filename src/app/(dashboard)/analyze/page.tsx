@@ -24,6 +24,14 @@ const SIEM_OPTIONS: { value: SIEM; label: string; description: string }[] = [
   { value: 'cribl', label: 'Cribl', description: 'Routes, Pipelines, Packs' },
 ];
 
+interface FieldExtraction {
+  name: string;
+  sampleValue: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+  nested?: boolean;
+  path?: string;
+}
+
 interface LogSampleAnalysis {
   timeFormat: string | null;
   timePrefix: string | null;
@@ -31,6 +39,7 @@ interface LogSampleAnalysis {
   kvMode: 'auto' | 'json' | 'none';
   maxTimestampLookahead: number;
   detectedFields: string[];
+  extractedFields: FieldExtraction[];
   confidence: 'high' | 'medium' | 'low';
   sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
   rawPattern: string | null;
@@ -46,7 +55,6 @@ export default function AnalyzePage() {
   const [outputFormat, setOutputFormat] = useState<'zip' | 'txt'>('zip');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [logSample, setLogSample] = useState('');
-  const [showSampleInput, setShowSampleInput] = useState(false);
   const [sampleAnalysis, setSampleAnalysis] = useState<LogSampleAnalysis | null>(null);
 
   const analyzeMutation = trpc.analyze.analyzeText.useMutation({
@@ -137,6 +145,158 @@ export default function AnalyzePage() {
         </div>
       </div>
 
+      {/* Log Sample Analysis - Top Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-5 h-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+            <CardTitle>Log Sample Analysis</CardTitle>
+            <Badge variant="outline" className="text-xs">
+              Optional
+            </Badge>
+          </div>
+          <CardDescription>
+            Paste a sample log line to auto-detect vendor, TIME_FORMAT, and field extractions
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            placeholder={`Example: 2024-01-15T10:30:45.123Z INFO [main] Application started successfully user=admin action=login`}
+            value={logSample}
+            onChange={(e) => setLogSample(e.target.value)}
+            className="min-h-[100px] font-mono text-xs"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAnalyzeSample}
+            disabled={!logSample.trim() || sampleMutation.isPending}
+          >
+            {sampleMutation.isPending ? 'Analyzing...' : 'Analyze Sample'}
+          </Button>
+
+          {sampleAnalysis && (
+            <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    sampleAnalysis.confidence === 'high'
+                      ? 'default'
+                      : sampleAnalysis.confidence === 'medium'
+                        ? 'secondary'
+                        : 'destructive'
+                  }
+                >
+                  {sampleAnalysis.confidence} confidence
+                </Badge>
+                <Badge variant="outline">{sampleAnalysis.sampleType}</Badge>
+              </div>
+              <div className="text-xs space-y-1 font-mono">
+                {sampleAnalysis.timeFormat && (
+                  <div>
+                    <span className="text-muted-foreground">TIME_FORMAT = </span>
+                    <span className="text-green-700 dark:text-green-400">
+                      {sampleAnalysis.timeFormat}
+                    </span>
+                  </div>
+                )}
+                {sampleAnalysis.timePrefix && (
+                  <div>
+                    <span className="text-muted-foreground">TIME_PREFIX = </span>
+                    <span className="text-green-700 dark:text-green-400">
+                      {sampleAnalysis.timePrefix}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-muted-foreground">KV_MODE = </span>
+                  <span className="text-green-700 dark:text-green-400">
+                    {sampleAnalysis.kvMode}
+                  </span>
+                </div>
+                {sampleAnalysis.detectedFields.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Fields: </span>
+                    <span className="text-green-700 dark:text-green-400">
+                      {sampleAnalysis.detectedFields.slice(0, 8).join(', ')}
+                      {sampleAnalysis.detectedFields.length > 8 && '...'}
+                    </span>
+                  </div>
+                )}
+                {sampleAnalysis.rawPattern && (
+                  <div className="pt-1 text-muted-foreground">
+                    Detected: <code className="bg-muted px-1">{sampleAnalysis.rawPattern}</code>
+                  </div>
+                )}
+              </div>
+
+              {/* Detected Vendor and Suggested Paths */}
+              {sampleAnalysis.detectedVendor && (
+                <div className="pt-2 border-t border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg
+                      className="w-4 h-4 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                      Detected: {sampleAnalysis.detectedVendor}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {sampleAnalysis.suggestedPaths && sampleAnalysis.suggestedPaths.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs font-medium text-green-800 dark:text-green-200 mb-2">
+                    Suggested log paths:
+                  </p>
+                  <div className="space-y-1">
+                    {sampleAnalysis.suggestedPaths.map((path, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleUseSuggestedPath(path)}
+                        className="w-full text-left px-2 py-1 text-xs font-mono bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 rounded border border-green-300 dark:border-green-700 transition-colors"
+                      >
+                        {path}
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleUseAllSuggestedPaths}
+                    className="mt-2 w-full"
+                  >
+                    Use All Suggested Paths
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Input Panel */}
         <Card>
@@ -194,180 +354,6 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
               </div>
             </div>
 
-            {/* Log Sample Analysis - Collapsible */}
-            <div className="border rounded-lg">
-              <button
-                onClick={() => setShowSampleInput(!showSampleInput)}
-                className="w-full flex items-center justify-between p-3 text-sm font-medium hover:bg-muted/50 rounded-lg"
-              >
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                  <span>Log Sample Analysis</span>
-                  <Badge variant="outline" className="text-xs">
-                    Optional
-                  </Badge>
-                </div>
-                <svg
-                  className={`w-4 h-4 transition-transform ${showSampleInput ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-
-              {showSampleInput && (
-                <div className="p-3 pt-0 space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Paste a sample log line to auto-detect TIME_FORMAT, LINE_BREAKER, and field
-                    extractions
-                  </p>
-                  <Textarea
-                    placeholder={`Example: 2024-01-15T10:30:45.123Z INFO [main] Application started successfully user=admin action=login`}
-                    value={logSample}
-                    onChange={(e) => setLogSample(e.target.value)}
-                    className="min-h-[80px] font-mono text-xs"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleAnalyzeSample}
-                    disabled={!logSample.trim() || sampleMutation.isPending}
-                  >
-                    {sampleMutation.isPending ? 'Analyzing...' : 'Analyze Sample'}
-                  </Button>
-
-                  {sampleAnalysis && (
-                    <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            sampleAnalysis.confidence === 'high'
-                              ? 'default'
-                              : sampleAnalysis.confidence === 'medium'
-                                ? 'secondary'
-                                : 'destructive'
-                          }
-                        >
-                          {sampleAnalysis.confidence} confidence
-                        </Badge>
-                        <Badge variant="outline">{sampleAnalysis.sampleType}</Badge>
-                      </div>
-                      <div className="text-xs space-y-1 font-mono">
-                        {sampleAnalysis.timeFormat && (
-                          <div>
-                            <span className="text-muted-foreground">TIME_FORMAT = </span>
-                            <span className="text-green-700 dark:text-green-400">
-                              {sampleAnalysis.timeFormat}
-                            </span>
-                          </div>
-                        )}
-                        {sampleAnalysis.timePrefix && (
-                          <div>
-                            <span className="text-muted-foreground">TIME_PREFIX = </span>
-                            <span className="text-green-700 dark:text-green-400">
-                              {sampleAnalysis.timePrefix}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-muted-foreground">KV_MODE = </span>
-                          <span className="text-green-700 dark:text-green-400">
-                            {sampleAnalysis.kvMode}
-                          </span>
-                        </div>
-                        {sampleAnalysis.detectedFields.length > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">Fields: </span>
-                            <span className="text-green-700 dark:text-green-400">
-                              {sampleAnalysis.detectedFields.slice(0, 8).join(', ')}
-                              {sampleAnalysis.detectedFields.length > 8 && '...'}
-                            </span>
-                          </div>
-                        )}
-                        {sampleAnalysis.rawPattern && (
-                          <div className="pt-1 text-muted-foreground">
-                            Detected:{' '}
-                            <code className="bg-muted px-1">{sampleAnalysis.rawPattern}</code>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Detected Vendor and Suggested Paths */}
-                      {sampleAnalysis.detectedVendor && (
-                        <div className="pt-2 border-t border-green-300 dark:border-green-700">
-                          <div className="flex items-center gap-2 mb-2">
-                            <svg
-                              className="w-4 h-4 text-green-600"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                            <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                              Detected: {sampleAnalysis.detectedVendor}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {sampleAnalysis.suggestedPaths &&
-                        sampleAnalysis.suggestedPaths.length > 0 && (
-                          <div className="pt-2">
-                            <p className="text-xs font-medium text-green-800 dark:text-green-200 mb-2">
-                              Suggested log paths:
-                            </p>
-                            <div className="space-y-1">
-                              {sampleAnalysis.suggestedPaths.map((path, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => handleUseSuggestedPath(path)}
-                                  className="w-full text-left px-2 py-1 text-xs font-mono bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 rounded border border-green-300 dark:border-green-700 transition-colors"
-                                >
-                                  {path}
-                                </button>
-                              ))}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={handleUseAllSuggestedPaths}
-                              className="mt-2 w-full"
-                            >
-                              Use All Suggested Paths
-                            </Button>
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="flex gap-2">
               <Button
                 onClick={handleAnalyze}
@@ -411,13 +397,33 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
           <CardContent>
             {result ? (
               <Tabs defaultValue="paths" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="paths">Paths</TabsTrigger>
-                  <TabsTrigger value="config1">{getConfigLabel(selectedSiem, 1)}</TabsTrigger>
-                  <TabsTrigger value="config2">{getConfigLabel(selectedSiem, 2)}</TabsTrigger>
-                  <TabsTrigger value="config3">{getConfigLabel(selectedSiem, 3)}</TabsTrigger>
-                  <TabsTrigger value="sensitive">Sensitive</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto pb-2">
+                  <TabsList className="inline-flex w-auto min-w-full justify-start">
+                    <TabsTrigger value="paths" className="flex-shrink-0">
+                      Paths
+                    </TabsTrigger>
+                    <TabsTrigger value="config1" className="flex-shrink-0">
+                      {getConfigLabel(selectedSiem, 1)}
+                    </TabsTrigger>
+                    <TabsTrigger value="config2" className="flex-shrink-0">
+                      {getConfigLabel(selectedSiem, 2)}
+                    </TabsTrigger>
+                    <TabsTrigger value="config3" className="flex-shrink-0">
+                      {getConfigLabel(selectedSiem, 3)}
+                    </TabsTrigger>
+                    {sampleAnalysis && sampleAnalysis.extractedFields.length > 0 && (
+                      <TabsTrigger value="fields" className="flex-shrink-0">
+                        Fields
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {sampleAnalysis.extractedFields.length}
+                        </Badge>
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="sensitive" className="flex-shrink-0">
+                      Sensitive
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <TabsContent value="paths" className="mt-4">
                   <PathAnalysisTable results={result.pathAnalysis} />
@@ -443,6 +449,15 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
                     deployInfo={getDeploymentInfo(selectedSiem, 2)}
                   />
                 </TabsContent>
+
+                {sampleAnalysis && sampleAnalysis.extractedFields.length > 0 && (
+                  <TabsContent value="fields" className="mt-4">
+                    <ExtractedFieldsTable
+                      fields={sampleAnalysis.extractedFields}
+                      sampleType={sampleAnalysis.sampleType}
+                    />
+                  </TabsContent>
+                )}
 
                 <TabsContent value="sensitive" className="mt-4">
                   <SensitiveFindingsTable findings={result.sensitiveFindings} />
@@ -577,6 +592,159 @@ function DeploymentBanner({ info }: { info: ConfigInfo }) {
   );
 }
 
+function ExtractedFieldsTable({
+  fields,
+  sampleType,
+}: {
+  fields: FieldExtraction[];
+  sampleType: string;
+}) {
+  if (fields.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No fields extracted from log sample
+      </div>
+    );
+  }
+
+  // Group fields by nested status for better organization
+  const topLevelFields = fields.filter((f) => !f.nested);
+  const nestedFields = fields.filter((f) => f.nested);
+
+  const getTypeColor = (type: string) => {
+    const colors: Record<string, string> = {
+      string: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      number: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      boolean: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      object: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      array: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
+      null: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    };
+    return colors[type] || colors.string;
+  };
+
+  const truncateValue = (value: string, maxLength = 100) => {
+    if (value.length <= maxLength) return value;
+    return value.substring(0, maxLength) + '...';
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Info banner */}
+      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div className="flex items-start gap-2">
+          <svg
+            className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <div className="flex-1">
+            <div className="text-sm font-medium text-blue-900 dark:text-blue-200">
+              Extracted {fields.length} field{fields.length !== 1 ? 's' : ''} from {sampleType} log
+              sample
+            </div>
+            <div className="text-xs text-blue-800 dark:text-blue-300 mt-1">
+              These fields can be used for field extractions in props.conf or transforms.conf.
+              {nestedFields.length > 0 && ` Includes ${nestedFields.length} nested field(s).`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top-level fields */}
+      {topLevelFields.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">
+            Top-Level Fields ({topLevelFields.length})
+          </h3>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {topLevelFields.map((field, index) => (
+              <div key={index} className="p-3 border rounded-lg bg-card hover:bg-muted/50">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <code className="font-mono text-sm font-semibold text-foreground">
+                        {field.name}
+                      </code>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded font-medium ${getTypeColor(field.type)}`}
+                      >
+                        {field.type}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">Sample value: </span>
+                      <code className="bg-muted px-2 py-1 rounded text-xs break-all">
+                        {truncateValue(field.sampleValue)}
+                      </code>
+                    </div>
+                    {field.path && field.path !== field.name && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Path: <code className="text-xs">{field.path}</code>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Nested fields */}
+      {nestedFields.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">
+            Nested Fields ({nestedFields.length})
+          </h3>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {nestedFields.map((field, index) => (
+              <div
+                key={index}
+                className="p-3 border rounded-lg bg-card hover:bg-muted/50 border-l-4 border-l-blue-500"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <code className="font-mono text-sm font-semibold text-foreground">
+                        {field.name}
+                      </code>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded font-medium ${getTypeColor(field.type)}`}
+                      >
+                        {field.type}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">Sample value: </span>
+                      <code className="bg-muted px-2 py-1 rounded text-xs break-all">
+                        {truncateValue(field.sampleValue)}
+                      </code>
+                    </div>
+                    {field.path && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Full path: <code className="text-xs">{field.path}</code>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SensitiveFindingsTable({ findings }: { findings: SensitiveFinding[] }) {
   if (findings.length === 0) {
     return (
@@ -584,17 +752,100 @@ function SensitiveFindingsTable({ findings }: { findings: SensitiveFinding[] }) 
     );
   }
 
+  const getSensitivityExplanation = (pattern: string, description: string): string => {
+    const explanations: Record<string, string> = {
+      domain_name:
+        'Domain names in log paths may expose internal network topology, infrastructure details, or customer/tenant information that should be masked in shared environments.',
+      email:
+        'Email addresses are Personally Identifiable Information (PII) that must be protected under GDPR, CCPA, and other privacy regulations. Logging emails can expose user identities.',
+      ipv4_address:
+        'IP addresses can be used to identify users or systems and may be considered PII under privacy regulations. Internal IPs expose network architecture.',
+      ssn: 'Social Security Numbers are highly sensitive PII requiring strict protection under federal law. Accidental logging of SSNs is a critical security violation.',
+      credit_card:
+        'Credit card numbers (PCI DSS data) must never be logged in plaintext. Discovery of card numbers in logs indicates a critical compliance violation.',
+      api_key:
+        'API keys and tokens provide authentication credentials. Exposure in logs creates security vulnerabilities allowing unauthorized access to systems.',
+      password:
+        'Passwords or secrets in logs create critical security risks. Even hashed passwords should not be logged due to potential replay attacks.',
+      phone:
+        'Phone numbers are PII under privacy regulations and can be used to identify individuals. Should be masked in compliance environments.',
+    };
+
+    return (
+      explanations[pattern] ||
+      `${description} detected in log paths. This pattern may contain sensitive information that should be reviewed and potentially masked before indexing.`
+    );
+  };
+
   return (
-    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+    <div className="space-y-3 max-h-[400px] overflow-y-auto">
       {findings.map((finding, index) => (
-        <div key={index} className="p-3 border rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{finding.description}</span>
+        <div key={index} className="p-4 border rounded-lg bg-card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <span className="font-medium text-base">{finding.description}</span>
+              <div className="text-sm text-muted-foreground mt-1">
+                Pattern:{' '}
+                <code className="bg-muted px-1 py-0.5 rounded text-xs">{finding.pattern}</code>
+              </div>
+            </div>
             <RiskBadge level={finding.riskLevel} />
           </div>
-          <div className="mt-1 text-sm text-muted-foreground">
-            {finding.count} occurrence(s) found
+
+          {/* Why it's sensitive */}
+          <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded">
+            <div className="flex items-start gap-2">
+              <svg
+                className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <div>
+                <div className="text-xs font-medium text-amber-900 dark:text-amber-200 mb-1">
+                  Why this is sensitive:
+                </div>
+                <div className="text-xs text-amber-800 dark:text-amber-300">
+                  {getSensitivityExplanation(finding.pattern, finding.description)}
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div className="text-sm text-muted-foreground mb-2">
+            <strong>{finding.count}</strong> occurrence(s) found
+          </div>
+
+          {/* Recommended action */}
+          {finding.maskFormat && (
+            <div className="mb-3 text-xs">
+              <span className="font-medium text-muted-foreground">Recommended masking: </span>
+              <code className="bg-muted px-2 py-1 rounded">{finding.maskFormat}</code>
+            </div>
+          )}
+
+          {finding.locations && finding.locations.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Found in paths:</div>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {finding.locations.map((location, idx) => (
+                  <div
+                    key={idx}
+                    className="text-xs font-mono bg-muted/50 px-2 py-1 rounded border border-muted-foreground/20 break-all"
+                  >
+                    {location}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>

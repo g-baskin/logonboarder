@@ -20,6 +20,15 @@ const analyzeInputSchema = z.object({
   }),
 });
 
+// Schema for field extraction
+const fieldExtractionSchema = z.object({
+  name: z.string(),
+  sampleValue: z.string(),
+  type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'null']),
+  nested: z.boolean().optional(),
+  path: z.string().optional(),
+});
+
 // Schema for log sample analysis (optional enhancement)
 const sampleAnalysisSchema = z
   .object({
@@ -29,6 +38,7 @@ const sampleAnalysisSchema = z
     kvMode: z.enum(['auto', 'json', 'none']),
     maxTimestampLookahead: z.number(),
     detectedFields: z.array(z.string()),
+    extractedFields: z.array(fieldExtractionSchema),
     confidence: z.enum(['high', 'medium', 'low']),
     sampleType: z.enum(['json', 'kv', 'syslog', 'apache', 'csv', 'unknown']),
     rawPattern: z.string().nullable(),

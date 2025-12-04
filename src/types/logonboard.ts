@@ -143,6 +143,15 @@ export interface AnalyzeResponse {
   downloadUrl?: string;
 }
 
+// Field extraction with sample values
+export interface FieldExtraction {
+  name: string;
+  sampleValue: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+  nested?: boolean;
+  path?: string; // For nested JSON fields like "user.name"
+}
+
 // Log sample analysis result - used to enhance props.conf generation
 export interface LogSampleAnalysis {
   timeFormat: string | null;
@@ -151,6 +160,7 @@ export interface LogSampleAnalysis {
   kvMode: 'auto' | 'json' | 'none';
   maxTimestampLookahead: number;
   detectedFields: string[];
+  extractedFields: FieldExtraction[]; // New: fields with sample values
   confidence: 'high' | 'medium' | 'low';
   sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
   rawPattern: string | null;

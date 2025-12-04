@@ -1,20 +1,7 @@
 // Log Sample Analyzer - Detects timestamp formats, line breakers, and field patterns
 // This eliminates guesswork by analyzing actual log samples
 
-export interface LogSampleAnalysis {
-  timeFormat: string | null;
-  timePrefix: string | null;
-  lineBreaker: string;
-  kvMode: 'auto' | 'json' | 'none';
-  maxTimestampLookahead: number;
-  detectedFields: string[];
-  confidence: 'high' | 'medium' | 'low';
-  sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
-  rawPattern: string | null;
-  suggestedPaths: string[]; // Suggested log paths based on detected log type
-  detectedVendor: string | null; // e.g., "Palo Alto Networks", "Apache", "Cisco"
-  suggestedSourcetype: string | null; // e.g., "pan:traffic", "apache:access", "linux_secure"
-}
+import type { LogSampleAnalysis, FieldExtraction } from '@/types/logonboard';
 
 // Common timestamp patterns with their Splunk TIME_FORMAT equivalents
 const TIMESTAMP_PATTERNS: { regex: RegExp; format: string; prefix?: string; lookahead: number }[] =
@@ -136,24 +123,31 @@ const TIMESTAMP_PATTERNS: { regex: RegExp; format: string; prefix?: string; look
 export function analyzeLogSample(sample: string): LogSampleAnalysis {
   const lines = sample.trim().split('\n');
   const firstLine = lines[0] || '';
+  const fullSample = sample.trim(); // Keep full sample for multi-line JSON detection
 
-  // Detect sample type
-  const sampleType = detectSampleType(firstLine);
+  // Detect sample type (use full sample to handle multi-line JSON)
+  const sampleType = detectSampleType(fullSample);
+
+  // For single-line formats, use firstLine; for JSON, use fullSample
+  const analyzeTarget = sampleType === 'json' ? fullSample : firstLine;
 
   // Detect timestamp
-  const timestampInfo = detectTimestamp(firstLine);
+  const timestampInfo = detectTimestamp(analyzeTarget);
 
   // Detect KV mode
-  const kvMode = detectKVMode(firstLine, sampleType);
+  const kvMode = detectKVMode(analyzeTarget, sampleType);
 
-  // Detect fields
-  const detectedFields = detectFields(firstLine, sampleType);
+  // Detect fields (names only, for backward compatibility)
+  const detectedFields = detectFields(analyzeTarget, sampleType);
+
+  // Extract fields with values (new feature)
+  const extractedFields = extractFieldsWithValues(analyzeTarget, sampleType);
 
   // Detect line breaker
   const lineBreaker = detectLineBreaker(lines);
 
   // Detect vendor and suggest paths
-  const vendorInfo = detectVendorAndPaths(firstLine, detectedFields);
+  const vendorInfo = detectVendorAndPaths(analyzeTarget, detectedFields);
 
   // Calculate confidence
   const confidence = calculateConfidence(timestampInfo, sampleType, detectedFields);
@@ -165,6 +159,7 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
     kvMode,
     maxTimestampLookahead: timestampInfo?.lookahead || 150,
     detectedFields,
+    extractedFields,
     confidence,
     sampleType,
     rawPattern: timestampInfo?.rawMatch || null,
@@ -177,34 +172,37 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
 function detectSampleType(line: string): 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown' {
   const trimmed = line.trim();
 
-  // JSON detection
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+  // JSON detection (handles both single-line and multi-line formatted JSON)
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       JSON.parse(trimmed);
       return 'json';
     } catch {
-      // Not valid JSON
+      // Not valid JSON, continue with other checks
     }
   }
 
+  // For multi-line samples, check the first line only for other formats
+  const firstLine = trimmed.split('\n')[0] || '';
+
   // Apache Combined/Common Log Format
-  if (/^\S+\s+\S+\s+\S+\s+\[.*\]\s+"[A-Z]+\s+/.test(trimmed)) {
+  if (/^\S+\s+\S+\s+\S+\s+\[.*\]\s+"[A-Z]+\s+/.test(firstLine)) {
     return 'apache';
   }
 
   // Syslog format
-  if (/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+/.test(trimmed)) {
+  if (/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+/.test(firstLine)) {
     return 'syslog';
   }
 
   // CSV detection (comma-separated with consistent field count)
-  const commaCount = (trimmed.match(/,/g) || []).length;
-  if (commaCount >= 3 && !trimmed.includes('=')) {
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  if (commaCount >= 3 && !firstLine.includes('=')) {
     return 'csv';
   }
 
   // Key=Value detection
-  if (/\w+=["']?[^"'\s]+["']?/.test(trimmed)) {
+  if (/\w+=["']?[^"'\s]+["']?/.test(firstLine)) {
     return 'kv';
   }
 
@@ -214,6 +212,48 @@ function detectSampleType(line: string): 'json' | 'kv' | 'syslog' | 'apache' | '
 function detectTimestamp(
   line: string
 ): { format: string; prefix: string | null; lookahead: number; rawMatch: string } | null {
+  // Try to extract timestamp from JSON first
+  if (line.trim().startsWith('{')) {
+    try {
+      const json = JSON.parse(line);
+      // Common JSON timestamp field names
+      const timestampFields = [
+        'timestamp',
+        '@timestamp',
+        'time',
+        'datetime',
+        'ts',
+        'eventTime',
+        'eventtime',
+        'created',
+        'createdAt',
+        'created_at',
+        'date',
+      ];
+
+      for (const field of timestampFields) {
+        const value = getNestedValue(json, field);
+        if (value && typeof value === 'string') {
+          // Try to match the timestamp value against our patterns
+          for (const pattern of TIMESTAMP_PATTERNS) {
+            const match = value.match(pattern.regex);
+            if (match) {
+              return {
+                format: pattern.format,
+                prefix: pattern.prefix || null,
+                lookahead: pattern.lookahead,
+                rawMatch: match[0],
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // Not valid JSON, continue with string matching
+    }
+  }
+
+  // Fallback to pattern matching on the full line
   for (const pattern of TIMESTAMP_PATTERNS) {
     const match = line.match(pattern.regex);
     if (match) {
@@ -227,6 +267,23 @@ function detectTimestamp(
   }
 
   return null;
+}
+
+// Helper function to get nested JSON values
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  if (!obj || typeof obj !== 'object') return undefined;
+  // Support both direct keys and nested paths like "log.timestamp"
+  if (path in obj) return obj[path];
+  const parts = path.split('.');
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current && typeof current === 'object' && part in (current as Record<string, unknown>)) {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
 }
 
 function detectKVMode(line: string, sampleType: string): 'auto' | 'json' | 'none' {
@@ -281,6 +338,130 @@ function detectFields(line: string, sampleType: string): string[] {
 
   if (sampleType === 'syslog') {
     return ['timestamp', 'host', 'process', 'pid', 'message'];
+  }
+
+  return fields;
+}
+
+// Extract fields with their sample values and types
+function extractFieldsWithValues(line: string, sampleType: string): FieldExtraction[] {
+  const fields: FieldExtraction[] = [];
+
+  if (sampleType === 'json') {
+    try {
+      const parsed = JSON.parse(line.trim());
+
+      // Recursively extract fields from nested JSON
+      const extractNested = (obj: Record<string, unknown>, prefix = ''): void => {
+        for (const [key, value] of Object.entries(obj)) {
+          const fieldPath = prefix ? `${prefix}.${key}` : key;
+          const fieldName = prefix ? key : key; // Top-level shows just key name
+          const valueType = Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value;
+
+          if (valueType === 'object' && value !== null && !Array.isArray(value)) {
+            // For nested objects, add the object itself and recurse
+            fields.push({
+              name: fieldName,
+              sampleValue: JSON.stringify(value),
+              type: 'object',
+              nested: !!prefix,
+              path: fieldPath,
+            });
+            extractNested(value, fieldPath);
+          } else if (valueType === 'array') {
+            fields.push({
+              name: fieldName,
+              sampleValue: JSON.stringify(value),
+              type: 'array',
+              nested: !!prefix,
+              path: fieldPath,
+            });
+          } else {
+            fields.push({
+              name: fieldName,
+              sampleValue: String(value),
+              type: valueType as string,
+              nested: !!prefix,
+              path: fieldPath,
+            });
+          }
+        }
+      };
+
+      extractNested(parsed);
+      return fields.slice(0, 50); // Limit to 50 fields total
+    } catch {
+      return [];
+    }
+  }
+
+  if (sampleType === 'kv') {
+    const matches = line.match(/(\w+)=["']?([^"'\s,]+)["']?/g) || [];
+    for (const match of matches.slice(0, 30)) {
+      const [key, ...valueParts] = match.split('=');
+      const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+      if (key) {
+        const numValue = parseFloat(value);
+        const valueType = !isNaN(numValue) && value.trim() !== '' ? 'number' : 'string';
+        fields.push({
+          name: key,
+          sampleValue: value,
+          type: valueType,
+          path: key,
+        });
+      }
+    }
+    return fields;
+  }
+
+  if (sampleType === 'apache') {
+    // Parse common Apache log format
+    const apacheRegex =
+      /^(\S+) (\S+) (\S+) \[([^\]]+)\] "(\S+) (\S+) ([^"]+)" (\d+) (\S+)(?: "([^"]*)" "([^"]*)")?/;
+    const match = line.match(apacheRegex);
+    if (match) {
+      return [
+        { name: 'clientip', sampleValue: match[1] || '-', type: 'string', path: 'clientip' },
+        { name: 'ident', sampleValue: match[2] || '-', type: 'string', path: 'ident' },
+        { name: 'user', sampleValue: match[3] || '-', type: 'string', path: 'user' },
+        { name: 'timestamp', sampleValue: match[4] || '-', type: 'string', path: 'timestamp' },
+        { name: 'method', sampleValue: match[5] || '-', type: 'string', path: 'method' },
+        { name: 'uri', sampleValue: match[6] || '-', type: 'string', path: 'uri' },
+        { name: 'protocol', sampleValue: match[7] || '-', type: 'string', path: 'protocol' },
+        { name: 'status', sampleValue: match[8] || '-', type: 'number', path: 'status' },
+        { name: 'bytes', sampleValue: match[9] || '-', type: 'number', path: 'bytes' },
+        { name: 'referer', sampleValue: match[10] || '-', type: 'string', path: 'referer' },
+        { name: 'useragent', sampleValue: match[11] || '-', type: 'string', path: 'useragent' },
+      ];
+    }
+    return [];
+  }
+
+  if (sampleType === 'syslog') {
+    // Parse syslog format: timestamp host process[pid]: message
+    const syslogRegex = /^(\w{3}\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(\w+)(?:\[(\d+)\])?:\s*(.*)$/;
+    const match = line.match(syslogRegex);
+    if (match) {
+      return [
+        { name: 'timestamp', sampleValue: match[1] || '', type: 'string', path: 'timestamp' },
+        { name: 'host', sampleValue: match[2] || '', type: 'string', path: 'host' },
+        { name: 'process', sampleValue: match[3] || '', type: 'string', path: 'process' },
+        { name: 'pid', sampleValue: match[4] || '', type: 'number', path: 'pid' },
+        { name: 'message', sampleValue: match[5] || '', type: 'string', path: 'message' },
+      ];
+    }
+    return [];
+  }
+
+  if (sampleType === 'csv') {
+    // Basic CSV parsing
+    const values = line.split(',').map((v) => v.trim().replace(/^["']|["']$/g, ''));
+    return values.map((value, index) => ({
+      name: `field${index + 1}`,
+      sampleValue: value,
+      type: !isNaN(parseFloat(value)) && value.trim() !== '' ? 'number' : 'string',
+      path: `field${index + 1}`,
+    }));
   }
 
   return fields;
@@ -488,19 +669,54 @@ const VENDOR_PATTERNS: VendorPattern[] = [
   },
 ];
 
+// Helper function to extract all keys from a JSON object (including nested)
+function extractJsonKeys(obj: Record<string, unknown>, prefix = ''): string[] {
+  const keys: string[] = [];
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj)) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      keys.push(fullKey);
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        keys.push(...extractJsonKeys(value as Record<string, unknown>, fullKey));
+      }
+    }
+  }
+  return keys;
+}
+
 function detectVendorAndPaths(
   line: string,
-  fields: string[]
+  _fields: string[]
 ): { vendor: string | null; paths: string[]; sourcetype: string | null } {
   const lowerLine = line.toLowerCase();
 
+  // Try to parse as JSON for better field-based detection
+  let jsonData: Record<string, unknown> | null = null;
+  let jsonFields: string[] = [];
+  try {
+    if (line.trim().startsWith('{')) {
+      jsonData = JSON.parse(line) as Record<string, unknown>;
+      jsonFields = extractJsonKeys(jsonData).map((f) => f.toLowerCase());
+    }
+  } catch {
+    // Not JSON or invalid JSON, continue with string matching
+  }
+
   // Try each vendor pattern
   for (const pattern of VENDOR_PATTERNS) {
-    // Check if any indicators match
+    // Check if any indicators match (both in raw line and JSON fields)
     const hasIndicator =
       pattern.indicators.length === 0
         ? false
-        : pattern.indicators.some((indicator) => lowerLine.includes(indicator.toLowerCase()));
+        : pattern.indicators.some((indicator) => {
+            const lowerIndicator = indicator.toLowerCase();
+            // Check in raw line
+            if (lowerLine.includes(lowerIndicator)) return true;
+            // Check in JSON field names if available
+            if (jsonFields.length > 0 && jsonFields.some((f) => f.includes(lowerIndicator)))
+              return true;
+            return false;
+          });
 
     if (hasIndicator) {
       const logType = pattern.logTypeDetection?.(line) || null;

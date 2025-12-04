@@ -24,18 +24,45 @@ const SIEM_OPTIONS: { value: SIEM; label: string; description: string }[] = [
   { value: 'cribl', label: 'Cribl', description: 'Routes, Pipelines, Packs' },
 ];
 
+interface LogSampleAnalysis {
+  timeFormat: string | null;
+  timePrefix: string | null;
+  lineBreaker: string;
+  kvMode: 'auto' | 'json' | 'none';
+  maxTimestampLookahead: number;
+  detectedFields: string[];
+  confidence: 'high' | 'medium' | 'low';
+  sampleType: 'json' | 'kv' | 'syslog' | 'apache' | 'csv' | 'unknown';
+  rawPattern: string | null;
+}
+
 export default function AnalyzePage() {
   const [pathsText, setPathsText] = useState('');
   const [selectedSiem, setSelectedSiem] = useState<SIEM>('splunk');
   const [runSensitiveScan, setRunSensitiveScan] = useState(true);
   const [outputFormat, setOutputFormat] = useState<'zip' | 'txt'>('zip');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [logSample, setLogSample] = useState('');
+  const [showSampleInput, setShowSampleInput] = useState(false);
+  const [sampleAnalysis, setSampleAnalysis] = useState<LogSampleAnalysis | null>(null);
 
   const analyzeMutation = trpc.analyze.analyzeText.useMutation({
     onSuccess: (data) => {
       setResult(data);
     },
   });
+
+  const sampleMutation = trpc.analyze.analyzeLogSample.useMutation({
+    onSuccess: (data) => {
+      setSampleAnalysis(data);
+    },
+  });
+
+  const handleAnalyzeSample = () => {
+    if (logSample.trim()) {
+      sampleMutation.mutate({ sample: logSample });
+    }
+  };
 
   const handleAnalyze = () => {
     analyzeMutation.mutate({
@@ -151,6 +178,128 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Log Sample Analysis - Collapsible */}
+            <div className="border rounded-lg">
+              <button
+                onClick={() => setShowSampleInput(!showSampleInput)}
+                className="w-full flex items-center justify-between p-3 text-sm font-medium hover:bg-muted/50 rounded-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-green-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    />
+                  </svg>
+                  <span>Log Sample Analysis</span>
+                  <Badge variant="outline" className="text-xs">
+                    Optional
+                  </Badge>
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${showSampleInput ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {showSampleInput && (
+                <div className="p-3 pt-0 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Paste a sample log line to auto-detect TIME_FORMAT, LINE_BREAKER, and field
+                    extractions
+                  </p>
+                  <Textarea
+                    placeholder={`Example: 2024-01-15T10:30:45.123Z INFO [main] Application started successfully user=admin action=login`}
+                    value={logSample}
+                    onChange={(e) => setLogSample(e.target.value)}
+                    className="min-h-[80px] font-mono text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAnalyzeSample}
+                    disabled={!logSample.trim() || sampleMutation.isPending}
+                  >
+                    {sampleMutation.isPending ? 'Analyzing...' : 'Analyze Sample'}
+                  </Button>
+
+                  {sampleAnalysis && (
+                    <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            sampleAnalysis.confidence === 'high'
+                              ? 'default'
+                              : sampleAnalysis.confidence === 'medium'
+                                ? 'secondary'
+                                : 'destructive'
+                          }
+                        >
+                          {sampleAnalysis.confidence} confidence
+                        </Badge>
+                        <Badge variant="outline">{sampleAnalysis.sampleType}</Badge>
+                      </div>
+                      <div className="text-xs space-y-1 font-mono">
+                        {sampleAnalysis.timeFormat && (
+                          <div>
+                            <span className="text-muted-foreground">TIME_FORMAT = </span>
+                            <span className="text-green-700 dark:text-green-400">
+                              {sampleAnalysis.timeFormat}
+                            </span>
+                          </div>
+                        )}
+                        {sampleAnalysis.timePrefix && (
+                          <div>
+                            <span className="text-muted-foreground">TIME_PREFIX = </span>
+                            <span className="text-green-700 dark:text-green-400">
+                              {sampleAnalysis.timePrefix}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-muted-foreground">KV_MODE = </span>
+                          <span className="text-green-700 dark:text-green-400">
+                            {sampleAnalysis.kvMode}
+                          </span>
+                        </div>
+                        {sampleAnalysis.detectedFields.length > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">Fields: </span>
+                            <span className="text-green-700 dark:text-green-400">
+                              {sampleAnalysis.detectedFields.slice(0, 8).join(', ')}
+                              {sampleAnalysis.detectedFields.length > 8 && '...'}
+                            </span>
+                          </div>
+                        )}
+                        {sampleAnalysis.rawPattern && (
+                          <div className="pt-1 text-muted-foreground">
+                            Detected:{' '}
+                            <code className="bg-muted px-1">{sampleAnalysis.rawPattern}</code>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">

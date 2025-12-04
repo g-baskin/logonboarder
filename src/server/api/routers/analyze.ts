@@ -4,6 +4,7 @@ import { analyzePaths } from '@/server/services/path-analyzer';
 import { scanPathsForSensitiveData } from '@/server/services/sensitive-scanner';
 import { generateConfigForSIEM } from '@/server/services/generators';
 import { exportAsTxt } from '@/server/services/exporter';
+import { analyzeLogSample } from '@/server/services/log-sample-analyzer';
 import type { AnalyzeResponse, SIEM } from '@/types/logonboard';
 
 // Supported SIEM platforms
@@ -112,4 +113,11 @@ export const analyzeRouter = createTRPCRouter({
     const results = analyzePaths([input.path]);
     return results[0] || null;
   }),
+
+  // Analyze a log sample to detect TIME_FORMAT, LINE_BREAKER, etc.
+  analyzeLogSample: publicProcedure
+    .input(z.object({ sample: z.string().min(1, 'Please provide a log sample') }))
+    .mutation(({ input }) => {
+      return analyzeLogSample(input.sample);
+    }),
 });

@@ -163,41 +163,41 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
   const confidence = calculateConfidence(timestampInfo, sampleType, detectedFields);
 
   // Detect platform and format
-  const detectedPlatform = detectPlatform(sample, vendorInfo.vendor, vendorInfo.paths);
-  const detectedFormat = detectFormat(sample, sampleType, vendorInfo.vendor);
+  const detectedPlatform = detectPlatform(sample, vendorInfo._vendor, vendorInfo.paths);
+  const detectedFormat = detectFormat(sample, sampleType, vendorInfo._vendor);
 
   // Determine input methods for all SIEMs
   const splunkInputMethodInfo = determineSplunkInputMethod(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor
+    vendorInfo._vendor
   );
   const elasticInputMethodInfo = determineElasticInputMethod(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor
+    vendorInfo._vendor
   );
   const sentinelInputMethodInfo = determineSentinelInputMethod(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor
+    vendorInfo._vendor
   );
   const qradarInputMethodInfo = determineQRadarInputMethod(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor
+    vendorInfo._vendor
   );
   const criblInputMethodInfo = determineCriblInputMethod(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor
+    vendorInfo._vendor
   );
 
   // Generate platform/format-aware sourcetype
   const platformAwareSourcetype = generateSourcetype(
     detectedPlatform,
     detectedFormat,
-    vendorInfo.vendor,
+    vendorInfo._vendor,
     vendorInfo.sourcetype
   );
 
@@ -213,7 +213,7 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
     sampleType,
     rawPattern: timestampInfo?.rawMatch || null,
     suggestedPaths: vendorInfo.paths,
-    detectedVendor: vendorInfo.vendor,
+    detectedVendor: vendorInfo._vendor,
     suggestedSourcetype: platformAwareSourcetype, // Now uses platform/format-aware sourcetype
     // New platform/format detection
     detectedPlatform,
@@ -805,7 +805,7 @@ function detectVendorAndPaths(line: string): {
       // Windows paths use backslashes
       if (pattern.name === 'Microsoft Windows') {
         return {
-          vendor: pattern.name,
+          _vendor: pattern.name,
           paths: [
             `C:\\Windows\\System32\\winevt\\Logs\\${logType}.evtx`,
             'C:\\Windows\\System32\\winevt\\Logs\\*.evtx',
@@ -815,7 +815,7 @@ function detectVendorAndPaths(line: string): {
       }
 
       return {
-        vendor: pattern.name,
+        _vendor: pattern.name,
         paths,
         sourcetype,
       };
@@ -825,7 +825,7 @@ function detectVendorAndPaths(line: string): {
   // Special case: Syslog format detection (structure-based, not keyword-based)
   if (/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\w+/.test(line)) {
     return {
-      vendor: 'Linux Syslog',
+      _vendor: 'Linux Syslog',
       paths: ['/var/log/syslog', '/var/log/messages'],
       sourcetype: 'linux:syslog',
     };
@@ -833,7 +833,7 @@ function detectVendorAndPaths(line: string): {
 
   // Default: No vendor detected, suggest generic paths
   return {
-    vendor: null,
+    _vendor: null,
     paths: ['/path/to/your/logs/*.log'],
     sourcetype: null,
   };
@@ -845,14 +845,14 @@ function detectVendorAndPaths(line: string): {
  */
 function detectPlatform(sample: string, _vendor: string | null, paths: string[]): LogPlatform {
   const lowerSample = sample.toLowerCase();
-  const allText = `${sample} ${vendor || ''} ${paths.join(' ')}`.toLowerCase();
+  const allText = `${sample} ${_vendor || ''} ${paths.join(' ')}`.toLowerCase();
 
   // Windows indicators
   if (
     /[a-z]:\\/.test(sample) || // Drive letter paths
     /\.evtx/i.test(sample) || // Windows Event Log
     /eventlog|winevt|windows/i.test(sample) ||
-    vendor === 'Microsoft Windows' ||
+    _vendor === 'Microsoft Windows' ||
     paths.some((p) => /^[a-z]:\\/i.test(p))
   ) {
     return 'windows';
@@ -948,7 +948,7 @@ function detectFormat(sample: string, sampleType: string, _vendor: string | null
   if (
     /<Event xmlns/.test(sample) ||
     /\.evtx|EventID|EventLog/i.test(sample) ||
-    vendor === 'Microsoft Windows'
+    _vendor === 'Microsoft Windows'
   ) {
     return 'windows-evtx';
   }
@@ -1012,26 +1012,26 @@ function generateSourcetype(
 ): string {
   // AWS platform
   if (platform === 'aws') {
-    if (vendor?.toLowerCase().includes('cloudwatch')) return 'aws:cloudwatch';
-    if (vendor?.toLowerCase().includes('s3')) return 'aws:s3';
-    if (vendor?.toLowerCase().includes('cloudtrail')) return 'aws:cloudtrail';
-    if (vendor?.toLowerCase().includes('vpc')) return 'aws:cloudwatch:vpcflow';
+    if (_vendor?.toLowerCase().includes('cloudwatch')) return 'aws:cloudwatch';
+    if (_vendor?.toLowerCase().includes('s3')) return 'aws:s3';
+    if (_vendor?.toLowerCase().includes('cloudtrail')) return 'aws:cloudtrail';
+    if (_vendor?.toLowerCase().includes('vpc')) return 'aws:cloudwatch:vpcflow';
     if (format === 'json') return 'aws:cloudwatch';
     return 'aws:log';
   }
 
   // Azure platform
   if (platform === 'azure') {
-    if (vendor?.toLowerCase().includes('activity')) return 'azure:activity';
-    if (vendor?.toLowerCase().includes('diagnostic')) return 'azure:diagnostic';
+    if (_vendor?.toLowerCase().includes('activity')) return 'azure:activity';
+    if (_vendor?.toLowerCase().includes('diagnostic')) return 'azure:diagnostic';
     if (format === 'json') return 'azure:log:json';
     return 'azure:log';
   }
 
   // GCP platform
   if (platform === 'gcp') {
-    if (vendor?.toLowerCase().includes('audit')) return 'gcp:audit';
-    if (vendor?.toLowerCase().includes('pubsub')) return 'gcp:pubsub';
+    if (_vendor?.toLowerCase().includes('audit')) return 'gcp:audit';
+    if (_vendor?.toLowerCase().includes('pubsub')) return 'gcp:pubsub';
     if (format === 'json') return 'gcp:log:json';
     return 'gcp:log';
   }
@@ -1051,17 +1051,17 @@ function generateSourcetype(
   // Windows platform
   if (platform === 'windows') {
     if (format === 'windows-evtx') return 'WinEventLog';
-    if (vendor?.toLowerCase().includes('security')) return 'WinEventLog:Security';
-    if (vendor?.toLowerCase().includes('system')) return 'WinEventLog:System';
-    if (vendor?.toLowerCase().includes('application')) return 'WinEventLog:Application';
+    if (_vendor?.toLowerCase().includes('security')) return 'WinEventLog:Security';
+    if (_vendor?.toLowerCase().includes('system')) return 'WinEventLog:System';
+    if (_vendor?.toLowerCase().includes('application')) return 'WinEventLog:Application';
     return 'windows:log';
   }
 
   // Linux/Unix platform
   if (platform === 'linux' || platform === 'unix') {
     if (format === 'syslog') return 'syslog';
-    if (vendor?.toLowerCase().includes('auth')) return 'linux:auth';
-    if (vendor?.toLowerCase().includes('secure')) return 'linux:secure';
+    if (_vendor?.toLowerCase().includes('auth')) return 'linux:auth';
+    if (_vendor?.toLowerCase().includes('secure')) return 'linux:secure';
     return 'linux:log';
   }
 

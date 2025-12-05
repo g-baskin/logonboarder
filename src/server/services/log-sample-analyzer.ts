@@ -7,6 +7,10 @@ import type {
   LogPlatform,
   LogFormat,
   SplunkInputMethod,
+  ElasticInputMethod,
+  SentinelInputMethod,
+  QRadarInputMethod,
+  CriblInputMethod,
 } from '@/types/logonboard';
 
 // Common timestamp patterns with their Splunk TIME_FORMAT equivalents
@@ -161,7 +165,29 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
   // Detect platform and format
   const detectedPlatform = detectPlatform(sample, vendorInfo.vendor, vendorInfo.paths);
   const detectedFormat = detectFormat(sample, sampleType, vendorInfo.vendor);
-  const inputMethodInfo = determineSplunkInputMethod(
+
+  // Determine input methods for all SIEMs
+  const splunkInputMethodInfo = determineSplunkInputMethod(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor
+  );
+  const elasticInputMethodInfo = determineElasticInputMethod(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor
+  );
+  const sentinelInputMethodInfo = determineSentinelInputMethod(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor
+  );
+  const qradarInputMethodInfo = determineQRadarInputMethod(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor
+  );
+  const criblInputMethodInfo = determineCriblInputMethod(
     detectedPlatform,
     detectedFormat,
     vendorInfo.vendor
@@ -192,8 +218,14 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
     // New platform/format detection
     detectedPlatform,
     detectedFormat,
-    splunkInputMethod: inputMethodInfo.method,
-    inputMethodNotes: inputMethodInfo.notes,
+    // SIEM-specific input methods
+    splunkInputMethod: splunkInputMethodInfo.method,
+    elasticInputMethod: elasticInputMethodInfo.method,
+    sentinelInputMethod: sentinelInputMethodInfo.method,
+    qradarInputMethod: qradarInputMethodInfo.method,
+    criblInputMethod: criblInputMethodInfo.method,
+    // Use Splunk notes as default (will be SIEM-aware in UI)
+    inputMethodNotes: splunkInputMethodInfo.notes,
   };
 }
 
@@ -721,7 +753,7 @@ function extractJsonKeys(obj: Record<string, unknown>, prefix = ''): string[] {
 }
 
 function detectVendorAndPaths(line: string): {
-  vendor: string | null;
+  _vendor: string | null;
   paths: string[];
   sourcetype: string | null;
 } {
@@ -811,7 +843,7 @@ function detectVendorAndPaths(line: string): {
  * Detect the platform/OS type from log sample
  * Analyzes log content, paths, and patterns to determine the source platform
  */
-function detectPlatform(sample: string, vendor: string | null, paths: string[]): LogPlatform {
+function detectPlatform(sample: string, _vendor: string | null, paths: string[]): LogPlatform {
   const lowerSample = sample.toLowerCase();
   const allText = `${sample} ${vendor || ''} ${paths.join(' ')}`.toLowerCase();
 
@@ -883,7 +915,7 @@ function detectPlatform(sample: string, vendor: string | null, paths: string[]):
  * Detect the log format type from sample
  * Determines the structure/format of the log data
  */
-function detectFormat(sample: string, sampleType: string, vendor: string | null): LogFormat {
+function detectFormat(sample: string, sampleType: string, _vendor: string | null): LogFormat {
   const trimmed = sample.trim();
   const lowerSample = sample.toLowerCase();
 
@@ -975,7 +1007,7 @@ function detectFormat(sample: string, sampleType: string, vendor: string | null)
 function generateSourcetype(
   platform: LogPlatform,
   format: LogFormat,
-  vendor: string | null,
+  _vendor: string | null,
   fallbackSourcetype: string | null
 ): string {
   // AWS platform
@@ -1061,7 +1093,7 @@ function generateSourcetype(
 function determineSplunkInputMethod(
   platform: LogPlatform,
   format: LogFormat,
-  vendor: string | null
+  _vendor: string | null
 ): { method: SplunkInputMethod; notes?: string } {
   // Cloud platforms typically use their specific collectors
   if (platform === 'aws') {
@@ -1142,6 +1174,206 @@ function determineSplunkInputMethod(
   // Default: standard file monitoring
   return {
     method: 'monitor',
+  };
+}
+
+/**
+ * Determine the best Elastic Stack input method based on platform and format
+ */
+function determineElasticInputMethod(
+  platform: LogPlatform,
+  format: LogFormat,
+  _vendor: string | null
+): { method: ElasticInputMethod; notes?: string } {
+  // Cloud platforms - use specific Filebeat modules
+  if (platform === 'aws') {
+    return {
+      method: 'filebeat-aws',
+      notes: 'Use Filebeat AWS module with CloudWatch, S3, or CloudTrail inputs.',
+    };
+  }
+
+  if (platform === 'azure') {
+    return {
+      method: 'filebeat-azure',
+      notes: 'Use Filebeat Azure module for Azure Activity Logs, Storage, or Event Hub.',
+    };
+  }
+
+  if (platform === 'gcp') {
+    return {
+      method: 'filebeat-gcp',
+      notes: 'Use Filebeat GCP module for Cloud Logging (Stackdriver) or Pub/Sub.',
+    };
+  }
+
+  // Windows Event Logs
+  if (platform === 'windows' && format === 'windows-evtx') {
+    return {
+      method: 'winlogbeat',
+      notes: 'Use Winlogbeat for Windows Event Log collection. Install on Windows hosts.',
+    };
+  }
+
+  // Container platforms
+  if (platform === 'docker' || platform === 'kubernetes') {
+    return {
+      method: 'filebeat',
+      notes:
+        'Deploy Filebeat as DaemonSet in Kubernetes or sidecar in Docker. Use autodiscover for dynamic container discovery.',
+    };
+  }
+
+  // Default: standard Filebeat
+  return {
+    method: 'filebeat',
+  };
+}
+
+/**
+ * Determine the best Microsoft Sentinel input method
+ */
+function determineSentinelInputMethod(
+  platform: LogPlatform,
+  format: LogFormat,
+  _vendor: string | null
+): { method: SentinelInputMethod; notes?: string } {
+  // Azure native logs
+  if (platform === 'azure') {
+    return {
+      method: 'data-connector',
+      notes: 'Use built-in Azure data connectors for native integration with Azure services.',
+    };
+  }
+
+  // Windows logs
+  if (platform === 'windows') {
+    return {
+      method: 'ama',
+      notes: 'Deploy Azure Monitor Agent (AMA) on Windows hosts with Data Collection Rules (DCR).',
+    };
+  }
+
+  // CEF/LEEF formats
+  if (format === 'cef' || format === 'leef') {
+    return {
+      method: 'cef',
+      notes:
+        'Use CEF/LEEF connector via syslog. Configure firewall/security appliances to forward to Sentinel.',
+    };
+  }
+
+  // Linux/Unix syslog
+  if (platform === 'linux' || platform === 'unix' || format === 'syslog') {
+    return {
+      method: 'syslog',
+      notes: 'Configure syslog connector and point log sources to the collector VM.',
+    };
+  }
+
+  // Cloud platforms - use API connectors
+  if (platform === 'aws' || platform === 'gcp') {
+    return {
+      method: 'api',
+      notes: 'Use REST API data connectors or Azure Functions for cloud platform integration.',
+    };
+  }
+
+  // Default: Azure Monitor Agent
+  return {
+    method: 'ama',
+  };
+}
+
+/**
+ * Determine the best IBM QRadar input method
+ */
+function determineQRadarInputMethod(
+  platform: LogPlatform,
+  format: LogFormat,
+  _vendor: string | null
+): { method: QRadarInputMethod; notes?: string } {
+  // Windows logs
+  if (platform === 'windows') {
+    return {
+      method: 'wincollect',
+      notes: 'Deploy QRadar WinCollect agent on Windows hosts for Event Log collection.',
+    };
+  }
+
+  // CEF/LEEF or syslog
+  if (format === 'cef' || format === 'leef' || format === 'syslog') {
+    return {
+      method: 'syslog',
+      notes: 'Configure log sources to forward syslog to QRadar Event Collector.',
+    };
+  }
+
+  // Cloud platforms - use Universal Cloud REST API
+  if (platform === 'aws' || platform === 'azure' || platform === 'gcp') {
+    return {
+      method: 'universal-cloud-rest',
+      notes: 'Use QRadar Universal Cloud REST API protocol for cloud platform logs.',
+    };
+  }
+
+  // Default: standard log source
+  return {
+    method: 'log-source',
+    notes: 'Configure as standard log source in QRadar. May require custom DSM mapping.',
+  };
+}
+
+/**
+ * Determine the best Cribl Stream input method
+ */
+function determineCriblInputMethod(
+  platform: LogPlatform,
+  format: LogFormat,
+  _vendor: string | null
+): { method: CriblInputMethod; notes?: string } {
+  // Cloud platforms - use native sources
+  if (platform === 'aws') {
+    return {
+      method: 's3',
+      notes: 'Use S3 source for archived logs or Kinesis for real-time streaming.',
+    };
+  }
+
+  if (platform === 'azure' || platform === 'gcp') {
+    return {
+      method: 'http',
+      notes: 'Configure HTTP/HTTPS source and use cloud platform webhooks or Event Hubs.',
+    };
+  }
+
+  // CEF/LEEF or syslog
+  if (format === 'cef' || format === 'leef' || format === 'syslog') {
+    return {
+      method: 'syslog',
+      notes: 'Configure Syslog source (TCP/UDP) and point log sources to Cribl.',
+    };
+  }
+
+  // JSON or structured
+  if (format === 'json' || format === 'xml') {
+    return {
+      method: 'http',
+      notes: 'Use HTTP/HTTPS source for structured data ingestion via REST API.',
+    };
+  }
+
+  // Container platforms
+  if (platform === 'docker' || platform === 'kubernetes') {
+    return {
+      method: 'http',
+      notes: 'Use Cribl Edge or HTTP source with container logging drivers.',
+    };
+  }
+
+  // Default: file monitoring
+  return {
+    method: 'file-monitor',
   };
 }
 

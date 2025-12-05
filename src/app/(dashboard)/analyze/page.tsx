@@ -75,6 +75,50 @@ type SplunkInputMethod =
   | 'azure-blob'
   | 'gcp-pubsub';
 
+// Input method for Elastic Stack
+type ElasticInputMethod =
+  | 'filebeat'
+  | 'filebeat-aws'
+  | 'filebeat-azure'
+  | 'filebeat-gcp'
+  | 'metricbeat'
+  | 'winlogbeat'
+  | 'functionbeat'
+  | 'logstash'
+  | 'elastic-agent';
+
+// Input method for Microsoft Sentinel
+type SentinelInputMethod =
+  | 'ama'
+  | 'log-analytics'
+  | 'data-connector'
+  | 'syslog'
+  | 'cef'
+  | 'api'
+  | 'logstash'
+  | 'function-app';
+
+// Input method for IBM QRadar
+type QRadarInputMethod =
+  | 'log-source'
+  | 'syslog'
+  | 'snmp'
+  | 'jdbc'
+  | 'wincollect'
+  | 'api'
+  | 'universal-cloud-rest';
+
+// Input method for Cribl Stream
+type CriblInputMethod =
+  | 'syslog'
+  | 'http'
+  | 's3'
+  | 'kinesis'
+  | 'kafka'
+  | 'splunk-hec'
+  | 'elastic-bulk'
+  | 'file-monitor';
+
 interface LogSampleAnalysis {
   timeFormat: string | null;
   timePrefix: string | null;
@@ -92,7 +136,12 @@ interface LogSampleAnalysis {
   // New platform/format detection
   detectedPlatform: LogPlatform;
   detectedFormat: LogFormat;
+  // SIEM-specific collection methods
   splunkInputMethod: SplunkInputMethod;
+  elasticInputMethod: ElasticInputMethod;
+  sentinelInputMethod: SentinelInputMethod;
+  qradarInputMethod: QRadarInputMethod;
+  criblInputMethod: CriblInputMethod;
   inputMethodNotes?: string;
 }
 
@@ -270,11 +319,18 @@ export default function AnalyzePage() {
                 <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900">
                   📄 {sampleAnalysis.detectedFormat.toUpperCase()}
                 </Badge>
-                {sampleAnalysis.splunkInputMethod !== 'monitor' && (
-                  <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900">
-                    ⚡ {sampleAnalysis.splunkInputMethod.toUpperCase()}
-                  </Badge>
-                )}
+                {(() => {
+                  const inputMethod = getSiemInputMethod(selectedSiem, sampleAnalysis);
+                  const defaultMethod = getDefaultInputMethod(selectedSiem);
+                  if (inputMethod !== defaultMethod) {
+                    return (
+                      <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900">
+                        ⚡ {inputMethod.toUpperCase()}
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               {sampleAnalysis.inputMethodNotes && (
                 <div className="p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
@@ -1004,14 +1060,16 @@ const DEPLOYMENT_GUIDANCE: Record<SIEM, [ConfigInfo, ConfigInfo, ConfigInfo]> = 
       description: 'Deploy Filebeat agent on each log source. Config at /etc/filebeat/filebeat.yml',
     },
     {
-      label: 'ingest-pipeline.json',
-      deployTo: 'Elasticsearch Cluster',
-      description: 'Import via Kibana Dev Tools or PUT _ingest/pipeline API. Runs on ingest nodes.',
+      label: 'logstash.conf',
+      deployTo: 'Logstash Nodes (Optional)',
+      description:
+        'Deploy to Logstash for advanced processing. Path: /etc/logstash/conf.d/. Can be skipped if using direct Filebeat → Elasticsearch.',
     },
     {
-      label: 'index-template.json',
+      label: 'ingest-pipeline.json',
       deployTo: 'Elasticsearch Cluster',
-      description: 'Import via PUT _index_template API. Defines mappings for ECS compliance.',
+      description:
+        'Import via PUT _ingest/pipeline/logonboard API. Handles grok parsing, field extraction, and data masking.',
     },
   ],
   sentinel: [
@@ -1082,26 +1140,69 @@ function getDeploymentInfo(siem: SIEM, index: 0 | 1 | 2): ConfigInfo {
 }
 
 function generateDownloadContent(result: AnalyzeResponse): string {
+  const siem = result.generatedConfig.siem || 'splunk';
+  const configLabels = DEPLOYMENT_GUIDANCE[siem];
+
   const lines = [
     '='.repeat(80),
-    'LogOnboard-AI Configuration Bundle',
+    `LogOnboard-AI Configuration Bundle - ${siem.toUpperCase()}`,
     '='.repeat(80),
     '',
-    '## INPUTS.CONF',
+    `## ${configLabels[0].label.toUpperCase()}`,
     '-'.repeat(40),
     result.generatedConfig.inputsConf,
     '',
-    '## PROPS.CONF',
+    `## ${configLabels[1].label.toUpperCase()}`,
     '-'.repeat(40),
     result.generatedConfig.propsConf,
     '',
-    '## TRANSFORMS.CONF',
+    `## ${configLabels[2].label.toUpperCase()}`,
     '-'.repeat(40),
     result.generatedConfig.transformsConf,
     '',
-    '## README',
-    '-'.repeat(40),
-    result.generatedConfig.readme,
   ];
+
+  // Add index template for Elastic Stack (4th file)
+  if (siem === 'elastic' && result.generatedConfig.elastic?.indexTemplate) {
+    lines.push('## INDEX-TEMPLATE.JSON');
+    lines.push('-'.repeat(40));
+    lines.push(result.generatedConfig.elastic.indexTemplate);
+    lines.push('');
+  }
+
+  lines.push('## README');
+  lines.push('-'.repeat(40));
+  lines.push(result.generatedConfig.readme);
+
   return lines.join('\n');
+}
+
+// Helper function to get SIEM-specific input method
+function getSiemInputMethod(siem: SIEM, analysis: LogSampleAnalysis): string {
+  switch (siem) {
+    case 'splunk':
+      return analysis.splunkInputMethod;
+    case 'elastic':
+      return analysis.elasticInputMethod;
+    case 'sentinel':
+      return analysis.sentinelInputMethod;
+    case 'qradar':
+      return analysis.qradarInputMethod;
+    case 'cribl':
+      return analysis.criblInputMethod;
+    default:
+      return analysis.splunkInputMethod;
+  }
+}
+
+// Helper function to get default input method for each SIEM
+function getDefaultInputMethod(siem: SIEM): string {
+  const defaults: Record<SIEM, string> = {
+    splunk: 'monitor',
+    elastic: 'filebeat',
+    sentinel: 'ama',
+    qradar: 'log-source',
+    cribl: 'file-monitor',
+  };
+  return defaults[siem];
 }

@@ -90,6 +90,7 @@ export interface SplunkConfig {
 
 export interface ElasticConfig {
   filebeatYml: string;
+  logstashConf: string;
   ingestPipeline: string;
   indexTemplate: string;
 }
@@ -195,6 +196,56 @@ export type SplunkInputMethod =
   | 'azure-blob' // Azure Blob Storage
   | 'gcp-pubsub'; // GCP Pub/Sub
 
+// Input method for Elastic Stack
+export type ElasticInputMethod =
+  | 'filebeat' // Standard Filebeat log file collection
+  | 'filebeat-aws' // Filebeat AWS module (S3, CloudWatch, etc.)
+  | 'filebeat-azure' // Filebeat Azure module
+  | 'filebeat-gcp' // Filebeat GCP module
+  | 'metricbeat' // Metricbeat for metrics
+  | 'winlogbeat' // Windows Event Log collection
+  | 'functionbeat' // Serverless log collection
+  | 'logstash' // Direct Logstash input
+  | 'elastic-agent'; // Unified Elastic Agent
+
+// Input method for Microsoft Sentinel
+export type SentinelInputMethod =
+  | 'ama' // Azure Monitor Agent
+  | 'log-analytics' // Log Analytics agent
+  | 'data-connector' // Native data connectors
+  | 'syslog' // Syslog connector
+  | 'cef' // Common Event Format connector
+  | 'api' // REST API ingestion
+  | 'logstash' // Logstash output plugin
+  | 'function-app'; // Azure Function App
+
+// Input method for IBM QRadar
+export type QRadarInputMethod =
+  | 'log-source' // Standard log source protocol
+  | 'syslog' // Syslog protocol
+  | 'snmp' // SNMP traps
+  | 'jdbc' // Database connection
+  | 'wincollect' // Windows event collection
+  | 'api' // QRadar API
+  | 'universal-cloud-rest'; // Universal Cloud REST API protocol
+
+// Input method for Cribl Stream
+export type CriblInputMethod =
+  | 'syslog' // Syslog source
+  | 'http' // HTTP/HTTPS endpoint
+  | 's3' // AWS S3
+  | 'kinesis' // AWS Kinesis
+  | 'kafka' // Apache Kafka
+  | 'splunk-hec' // Splunk HEC compatible
+  | 'elastic-bulk' // Elasticsearch Bulk API
+  | 'file-monitor'; // File monitoring
+
+// Collection method info for any SIEM
+export interface CollectionMethodInfo {
+  method: string;
+  notes?: string;
+}
+
 // Log sample analysis result - used to enhance props.conf generation
 export interface LogSampleAnalysis {
   timeFormat: string | null;
@@ -213,6 +264,11 @@ export interface LogSampleAnalysis {
   // New platform/format detection
   detectedPlatform: LogPlatform;
   detectedFormat: LogFormat;
+  // SIEM-specific collection methods
   splunkInputMethod: SplunkInputMethod;
+  elasticInputMethod: ElasticInputMethod;
+  sentinelInputMethod: SentinelInputMethod;
+  qradarInputMethod: QRadarInputMethod;
+  criblInputMethod: CriblInputMethod;
   inputMethodNotes?: string; // Special notes for non-standard input methods
 }

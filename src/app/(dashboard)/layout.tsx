@@ -27,6 +27,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link href="/analyze" className="text-sm hover:text-primary">
               Analyze
             </Link>
+            <Link href="/ta-translator" className="text-sm hover:text-primary">
+              TA Translator
+            </Link>
             <Link href="/" className="text-sm hover:text-primary">
               Home
             </Link>

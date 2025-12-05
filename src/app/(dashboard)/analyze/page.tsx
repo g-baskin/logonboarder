@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileUpload } from '@/components/FileUpload';
 import type {
   AnalyzeResponse,
   PathAnalysisResult,
@@ -265,17 +266,41 @@ export default function AnalyzePage() {
             </Badge>
           </div>
           <CardDescription>
-            Paste a sample log line to auto-detect vendor, TIME_FORMAT, and field extractions
+            Paste a sample log or upload a log file to auto-detect vendor, TIME_FORMAT, and field
+            extractions
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Textarea
-            placeholder={`Example: 2024-01-15T10:30:45.123Z INFO [main] Application started successfully user=admin action=login`}
-            value={logSample}
-            onChange={(e) => setLogSample(e.target.value)}
-            className="min-h-[100px] font-mono text-xs"
-            aria-label="Log sample input for analysis"
-          />
+          <Tabs defaultValue="paste" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="paste">Paste Text</TabsTrigger>
+              <TabsTrigger value="upload">Upload File</TabsTrigger>
+            </TabsList>
+            <TabsContent value="paste" className="space-y-3">
+              <Textarea
+                placeholder={`Example: 2024-01-15T10:30:45.123Z INFO [main] Application started successfully user=admin action=login`}
+                value={logSample}
+                onChange={(e) => setLogSample(e.target.value)}
+                className="min-h-[100px] font-mono text-xs"
+                aria-label="Log sample input for analysis"
+              />
+            </TabsContent>
+            <TabsContent value="upload" className="space-y-3">
+              <FileUpload
+                onFileRead={(content, _filename) => {
+                  setLogSample(content);
+                  // Auto-trigger analysis after file upload
+                  setTimeout(() => {
+                    if (content.trim()) {
+                      sampleMutation.mutate({ sample: content });
+                    }
+                  }, 100);
+                }}
+                acceptedTypes={['.log', '.json', '.csv', '.txt']}
+                maxSizeMB={10}
+              />
+            </TabsContent>
+          </Tabs>
           <div className="flex gap-2">
             <Button
               size="sm"

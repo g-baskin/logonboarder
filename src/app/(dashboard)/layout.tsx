@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { PrivacyBanner } from '@/components/PrivacyBanner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
+      <PrivacyBanner />
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -32,9 +32,12 @@ export function scanPathsForSensitiveData(paths: string[]): SensitiveFinding[] {
             });
           }
         }
-      } catch {
-        // Invalid regex, skip
-        console.warn(`Invalid regex pattern for ${patternName}`);
+      } catch (error) {
+        // Invalid regex pattern - skip this pattern and continue scanning
+        // This is logged only in development to help debug pattern configuration issues
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[Sensitive Scanner] Invalid regex pattern for "${patternName}":`, error);
+        }
       }
     }
   }

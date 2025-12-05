@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { TRPCProvider } from '@/trpc/client';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import './globals.css';
 
 const geistSans = Geist({
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Log Onboarding',
-  description: 'Next.js application with NextAuth, tRPC, Prisma, and more',
+  title: 'LogOnboard-AI',
+  description: 'Intelligent SIEM configuration generator powered by AI-driven log analysis',
 };
 
 export default function RootLayout({
@@ -26,7 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <TRPCProvider>{children}</TRPCProvider>
+        <ErrorBoundary>
+          <TRPCProvider>{children}</TRPCProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

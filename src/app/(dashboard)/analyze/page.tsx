@@ -32,6 +32,49 @@ interface FieldExtraction {
   path?: string;
 }
 
+// Platform/OS types for log files
+type LogPlatform =
+  | 'windows'
+  | 'linux'
+  | 'unix'
+  | 'macos'
+  | 'aws'
+  | 'azure'
+  | 'gcp'
+  | 'docker'
+  | 'kubernetes'
+  | 'cloud'
+  | 'unknown';
+
+// Log format types
+type LogFormat =
+  | 'json'
+  | 'xml'
+  | 'csv'
+  | 'cef'
+  | 'leef'
+  | 'windows-evtx'
+  | 'syslog'
+  | 'apache'
+  | 'nginx'
+  | 'iis'
+  | 'kv'
+  | 'custom'
+  | 'unknown';
+
+// Input method for Splunk
+type SplunkInputMethod =
+  | 'monitor'
+  | 'hec'
+  | 'scripted'
+  | 'wmi'
+  | 'powershell'
+  | 's3'
+  | 'kinesis'
+  | 'cloudwatch'
+  | 'azure-blob'
+  | 'gcp-pubsub';
+
 interface LogSampleAnalysis {
   timeFormat: string | null;
   timePrefix: string | null;
@@ -46,6 +89,11 @@ interface LogSampleAnalysis {
   suggestedPaths: string[];
   detectedVendor: string | null;
   suggestedSourcetype: string | null;
+  // New platform/format detection
+  detectedPlatform: LogPlatform;
+  detectedFormat: LogFormat;
+  splunkInputMethod: SplunkInputMethod;
+  inputMethodNotes?: string;
 }
 
 export default function AnalyzePage() {
@@ -177,19 +225,33 @@ export default function AnalyzePage() {
             value={logSample}
             onChange={(e) => setLogSample(e.target.value)}
             className="min-h-[100px] font-mono text-xs"
+            aria-label="Log sample input for analysis"
           />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleAnalyzeSample}
-            disabled={!logSample.trim() || sampleMutation.isPending}
-          >
-            {sampleMutation.isPending ? 'Analyzing...' : 'Analyze Sample'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAnalyzeSample}
+              disabled={!logSample.trim() || sampleMutation.isPending}
+              className="flex-1"
+            >
+              {sampleMutation.isPending ? 'Analyzing...' : 'Analyze Sample'}
+            </Button>
+            {sampleMutation.isPending && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => sampleMutation.reset()}
+                aria-label="Cancel log sample analysis"
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
 
           {sampleAnalysis && (
             <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge
                   variant={
                     sampleAnalysis.confidence === 'high'
@@ -202,7 +264,25 @@ export default function AnalyzePage() {
                   {sampleAnalysis.confidence} confidence
                 </Badge>
                 <Badge variant="outline">{sampleAnalysis.sampleType}</Badge>
+                <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900">
+                  📟 {sampleAnalysis.detectedPlatform.toUpperCase()}
+                </Badge>
+                <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900">
+                  📄 {sampleAnalysis.detectedFormat.toUpperCase()}
+                </Badge>
+                {sampleAnalysis.splunkInputMethod !== 'monitor' && (
+                  <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900">
+                    ⚡ {sampleAnalysis.splunkInputMethod.toUpperCase()}
+                  </Badge>
+                )}
               </div>
+              {sampleAnalysis.inputMethodNotes && (
+                <div className="p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
+                  <p className="text-yellow-900 dark:text-yellow-200">
+                    {sampleAnalysis.inputMethodNotes}
+                  </p>
+                </div>
+              )}
               <div className="text-xs space-y-1 font-mono">
                 {sampleAnalysis.timeFormat && (
                   <div>
@@ -277,6 +357,7 @@ export default function AnalyzePage() {
                         key={idx}
                         onClick={() => handleUseSuggestedPath(path)}
                         className="w-full text-left px-2 py-1 text-xs font-mono bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 rounded border border-green-300 dark:border-green-700 transition-colors"
+                        aria-label={`Use suggested log path: ${path}`}
                       >
                         {path}
                       </button>
@@ -311,6 +392,7 @@ export default function AnalyzePage() {
 C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
 /var/log/nginx/error.log`}
               value={pathsText}
+              aria-label="Log file paths input (one per line)"
               onChange={(e) => setPathsText(e.target.value)}
               className="min-h-[200px] font-mono text-sm"
             />
@@ -362,10 +444,19 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
               >
                 {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze Paths'}
               </Button>
+              {analyzeMutation.isPending && (
+                <Button
+                  variant="destructive"
+                  onClick={() => analyzeMutation.reset()}
+                  aria-label="Cancel path analysis"
+                >
+                  Cancel
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleClear}
-                disabled={!pathsText.trim() && !result}
+                disabled={(!pathsText.trim() && !result) || analyzeMutation.isPending}
               >
                 Clear
               </Button>
@@ -577,11 +668,16 @@ function DeploymentBanner({ info }: { info: ConfigInfo }) {
               onMouseLeave={() => setShowTooltip(false)}
               onClick={() => setShowTooltip(!showTooltip)}
               className="w-5 h-5 rounded-full bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-bold hover:bg-blue-300 dark:hover:bg-blue-700"
+              aria-label="Show deployment information"
+              aria-expanded={showTooltip}
             >
               ?
             </button>
             {showTooltip && (
-              <div className="absolute z-50 left-6 top-0 w-64 p-3 bg-white dark:bg-zinc-800 border rounded-lg shadow-lg text-xs text-zinc-700 dark:text-zinc-300">
+              <div
+                className="absolute z-50 left-6 top-0 w-64 p-3 bg-white dark:bg-zinc-800 border rounded-lg shadow-lg text-xs text-zinc-700 dark:text-zinc-300"
+                role="tooltip"
+              >
                 {info.description}
               </div>
             )}

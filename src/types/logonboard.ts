@@ -152,6 +152,49 @@ export interface FieldExtraction {
   path?: string; // For nested JSON fields like "user.name"
 }
 
+// Platform/OS types for log files
+export type LogPlatform =
+  | 'windows'
+  | 'linux'
+  | 'unix'
+  | 'macos'
+  | 'aws'
+  | 'azure'
+  | 'gcp'
+  | 'docker'
+  | 'kubernetes'
+  | 'cloud'
+  | 'unknown';
+
+// Log format types
+export type LogFormat =
+  | 'json'
+  | 'xml'
+  | 'csv'
+  | 'cef' // Common Event Format
+  | 'leef' // Log Event Extended Format
+  | 'windows-evtx' // Windows Event Log
+  | 'syslog'
+  | 'apache'
+  | 'nginx'
+  | 'iis'
+  | 'kv' // Key-value pairs
+  | 'custom'
+  | 'unknown';
+
+// Input method for Splunk
+export type SplunkInputMethod =
+  | 'monitor' // Standard file monitoring
+  | 'hec' // HTTP Event Collector (for JSON/structured)
+  | 'scripted' // Scripted input
+  | 'wmi' // Windows Management Instrumentation
+  | 'powershell' // PowerShell scripts
+  | 's3' // AWS S3
+  | 'kinesis' // AWS Kinesis
+  | 'cloudwatch' // AWS CloudWatch
+  | 'azure-blob' // Azure Blob Storage
+  | 'gcp-pubsub'; // GCP Pub/Sub
+
 // Log sample analysis result - used to enhance props.conf generation
 export interface LogSampleAnalysis {
   timeFormat: string | null;
@@ -167,4 +210,9 @@ export interface LogSampleAnalysis {
   suggestedPaths: string[];
   detectedVendor: string | null;
   suggestedSourcetype: string | null;
+  // New platform/format detection
+  detectedPlatform: LogPlatform;
+  detectedFormat: LogFormat;
+  splunkInputMethod: SplunkInputMethod;
+  inputMethodNotes?: string; // Special notes for non-standard input methods
 }

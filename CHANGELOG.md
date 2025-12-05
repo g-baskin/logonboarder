@@ -5,6 +5,72 @@ All notable changes to LogOnboard-AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-04
+
+### Added
+
+#### Field Extraction with Sample Values
+
+- **Intelligent field extraction** - Automatically extract field names, sample values, and data types from log samples
+- **Multi-format support** - Works with JSON (including nested), key-value pairs, Apache, syslog, and CSV formats
+- **Type detection** - Identifies field types: string, number, boolean, object, array, null
+- **Nested JSON handling** - Recursively extracts fields from nested objects with full path tracking (e.g., `user.name`)
+- **New "Fields" tab** - Dedicated UI tab showing all extracted fields with:
+  - Top-level fields section
+  - Nested fields section with visual indicators
+  - Color-coded type badges for easy identification
+  - Sample values preview (truncated for long values)
+  - Full field paths for nested properties
+
+#### Multi-line JSON Support
+
+- **Enhanced JSON detection** - Properly handles pretty-printed/formatted JSON across multiple lines
+- **Full sample parsing** - Analyzes entire log sample instead of just first line for JSON detection
+- **Improved confidence scoring** - Better accuracy for multi-line JSON samples
+
+### Changed
+
+- **Log sample analyzer** - Now uses full sample for JSON type detection instead of single-line analysis
+- **Type safety improvements** - Replaced `any` types with `Record<string, unknown>` for better type checking
+- **Field extraction API** - Added `extractedFields` array to `LogSampleAnalysis` interface
+
+### Fixed
+
+- **Multi-line JSON parsing bug** - Formatted JSON with line breaks now correctly identified and parsed
+- **Low confidence on valid JSON** - Multi-line JSON samples no longer marked as "unknown" type
+- **ESLint warnings** - Cleaned up unused variables and explicit `any` types
+
+### Documentation
+
+- Comprehensive inline documentation for field extraction logic
+- Updated type definitions with detailed JSDoc comments
+- Code examples for nested field path tracking
+
+### Technical Details
+
+**Files Modified:**
+
+- `src/types/logonboard.ts` - Added `FieldExtraction` interface
+- `src/server/services/log-sample-analyzer.ts` - Added field extraction with recursive JSON parsing
+- `src/server/api/routers/analyze.ts` - Updated Zod schemas for field extraction validation
+- `src/app/(dashboard)/analyze/page.tsx` - New `ExtractedFieldsTable` component with organized field display
+- `package.json` - Version bump to 0.3.0
+
+**New Features:**
+
+- `extractFieldsWithValues()` - Core field extraction function supporting all log formats
+- `ExtractedFieldsTable` - React component with color-coded field display
+- Recursive field extraction for nested JSON objects
+- Field path tracking for complex object hierarchies
+
+**Architecture Improvements:**
+
+- Type-safe field extraction with `FieldExtraction` interface
+- Conditional tab rendering based on extracted field count
+- Improved error handling in field extraction with try-catch blocks
+
+---
+
 ## [0.2.0] - 2025-12-04
 
 ### Added
@@ -95,5 +161,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.3.0]: https://github.com/g-baskin/logonboarder/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g-baskin/logonboarder/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g-baskin/logonboarder/releases/tag/v0.1.0

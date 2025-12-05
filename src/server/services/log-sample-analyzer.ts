@@ -1,7 +1,13 @@
 // Log Sample Analyzer - Detects timestamp formats, line breakers, and field patterns
 // This eliminates guesswork by analyzing actual log samples
 
-import type { LogSampleAnalysis, FieldExtraction } from '@/types/logonboard';
+import type {
+  LogSampleAnalysis,
+  FieldExtraction,
+  LogPlatform,
+  LogFormat,
+  SplunkInputMethod,
+} from '@/types/logonboard';
 
 // Common timestamp patterns with their Splunk TIME_FORMAT equivalents
 const TIMESTAMP_PATTERNS: { regex: RegExp; format: string; prefix?: string; lookahead: number }[] =
@@ -147,10 +153,27 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
   const lineBreaker = detectLineBreaker(lines);
 
   // Detect vendor and suggest paths
-  const vendorInfo = detectVendorAndPaths(analyzeTarget, detectedFields);
+  const vendorInfo = detectVendorAndPaths(analyzeTarget);
 
   // Calculate confidence
   const confidence = calculateConfidence(timestampInfo, sampleType, detectedFields);
+
+  // Detect platform and format
+  const detectedPlatform = detectPlatform(sample, vendorInfo.vendor, vendorInfo.paths);
+  const detectedFormat = detectFormat(sample, sampleType, vendorInfo.vendor);
+  const inputMethodInfo = determineSplunkInputMethod(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor
+  );
+
+  // Generate platform/format-aware sourcetype
+  const platformAwareSourcetype = generateSourcetype(
+    detectedPlatform,
+    detectedFormat,
+    vendorInfo.vendor,
+    vendorInfo.sourcetype
+  );
 
   return {
     timeFormat: timestampInfo?.format || null,
@@ -165,7 +188,12 @@ export function analyzeLogSample(sample: string): LogSampleAnalysis {
     rawPattern: timestampInfo?.rawMatch || null,
     suggestedPaths: vendorInfo.paths,
     detectedVendor: vendorInfo.vendor,
-    suggestedSourcetype: vendorInfo.sourcetype,
+    suggestedSourcetype: platformAwareSourcetype, // Now uses platform/format-aware sourcetype
+    // New platform/format detection
+    detectedPlatform,
+    detectedFormat,
+    splunkInputMethod: inputMethodInfo.method,
+    inputMethodNotes: inputMethodInfo.notes,
   };
 }
 
@@ -367,7 +395,7 @@ function extractFieldsWithValues(line: string, sampleType: string): FieldExtract
               nested: !!prefix,
               path: fieldPath,
             });
-            extractNested(value, fieldPath);
+            extractNested(value as Record<string, unknown>, fieldPath);
           } else if (valueType === 'array') {
             fields.push({
               name: fieldName,
@@ -377,10 +405,18 @@ function extractFieldsWithValues(line: string, sampleType: string): FieldExtract
               path: fieldPath,
             });
           } else {
+            // valueType is 'string', 'number', 'boolean', or 'null'
+            const fieldType =
+              valueType === 'string' ||
+              valueType === 'number' ||
+              valueType === 'boolean' ||
+              valueType === 'null'
+                ? valueType
+                : 'string';
             fields.push({
               name: fieldName,
               sampleValue: String(value),
-              type: valueType as string,
+              type: fieldType,
               nested: !!prefix,
               path: fieldPath,
             });
@@ -684,10 +720,11 @@ function extractJsonKeys(obj: Record<string, unknown>, prefix = ''): string[] {
   return keys;
 }
 
-function detectVendorAndPaths(
-  line: string,
-  _fields: string[]
-): { vendor: string | null; paths: string[]; sourcetype: string | null } {
+function detectVendorAndPaths(line: string): {
+  vendor: string | null;
+  paths: string[];
+  sourcetype: string | null;
+} {
   const lowerLine = line.toLowerCase();
 
   // Try to parse as JSON for better field-based detection
@@ -767,6 +804,344 @@ function detectVendorAndPaths(
     vendor: null,
     paths: ['/path/to/your/logs/*.log'],
     sourcetype: null,
+  };
+}
+
+/**
+ * Detect the platform/OS type from log sample
+ * Analyzes log content, paths, and patterns to determine the source platform
+ */
+function detectPlatform(sample: string, vendor: string | null, paths: string[]): LogPlatform {
+  const lowerSample = sample.toLowerCase();
+  const allText = `${sample} ${vendor || ''} ${paths.join(' ')}`.toLowerCase();
+
+  // Windows indicators
+  if (
+    /[a-z]:\\/.test(sample) || // Drive letter paths
+    /\.evtx/i.test(sample) || // Windows Event Log
+    /eventlog|winevt|windows/i.test(sample) ||
+    vendor === 'Microsoft Windows' ||
+    paths.some((p) => /^[a-z]:\\/i.test(p))
+  ) {
+    return 'windows';
+  }
+
+  // Cloud platforms (check before OS since they can run on any OS)
+  if (/aws|amazon|s3|ec2|lambda|cloudwatch|kinesis/.test(lowerSample) || /arn:aws/.test(sample)) {
+    return 'aws';
+  }
+
+  if (
+    /azure|microsoft cloud|azurewebsites|blob\.core\.windows/.test(lowerSample) ||
+    /"cloud":"azure"/i.test(sample)
+  ) {
+    return 'azure';
+  }
+
+  if (
+    /gcp|google cloud|cloud\.google|pubsub|bigquery/.test(lowerSample) ||
+    /projects\/[\w-]+\//.test(sample)
+  ) {
+    return 'gcp';
+  }
+
+  // Container platforms
+  if (/docker|container_id|container_name/.test(lowerSample) || /"container":/i.test(sample)) {
+    return 'docker';
+  }
+
+  if (/kubernetes|k8s|pod_name|namespace/.test(lowerSample) || /"kubernetes":/i.test(sample)) {
+    return 'kubernetes';
+  }
+
+  // Unix/Linux indicators
+  if (
+    /\/var\/log|\/usr\/|\/etc\/|syslog|\/home\//.test(sample) ||
+    paths.some((p) => p.startsWith('/'))
+  ) {
+    // Try to distinguish between generic Unix and Linux
+    if (/systemd|journalctl|dmesg|ubuntu|debian|centos|rhel|fedora/.test(lowerSample)) {
+      return 'linux';
+    }
+    return 'unix'; // Generic Unix (could be Linux, BSD, Solaris, etc.)
+  }
+
+  // macOS indicators
+  if (/\/Library\/Logs|\/System\/Library|darwin|macos/.test(allText)) {
+    return 'macos';
+  }
+
+  // If contains cloud indicators but not specific platform
+  if (/cloud|saas/.test(lowerSample)) {
+    return 'cloud';
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Detect the log format type from sample
+ * Determines the structure/format of the log data
+ */
+function detectFormat(sample: string, sampleType: string, vendor: string | null): LogFormat {
+  const trimmed = sample.trim();
+  const lowerSample = sample.toLowerCase();
+
+  // JSON format (already detected by sampleType)
+  if (sampleType === 'json' || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+    return 'json';
+  }
+
+  // XML format
+  if (trimmed.startsWith('<') && trimmed.includes('</')) {
+    return 'xml';
+  }
+
+  // CSV format
+  if (sampleType === 'csv' || /^[^,]+,[^,]+,/.test(trimmed)) {
+    return 'csv';
+  }
+
+  // CEF (Common Event Format) - starts with "CEF:"
+  if (/^CEF:\d+\|/.test(trimmed)) {
+    return 'cef';
+  }
+
+  // LEEF (Log Event Extended Format) - starts with "LEEF:"
+  if (/^LEEF:[\d.]+\|/.test(trimmed)) {
+    return 'leef';
+  }
+
+  // Windows Event Log XML format
+  if (
+    /<Event xmlns/.test(sample) ||
+    /\.evtx|EventID|EventLog/i.test(sample) ||
+    vendor === 'Microsoft Windows'
+  ) {
+    return 'windows-evtx';
+  }
+
+  // Syslog format (RFC 3164 or RFC 5424)
+  if (
+    sampleType === 'syslog' ||
+    /^<\d{1,3}>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}/.test(trimmed) || // RFC 3164
+    /^<\d{1,3}>\d+\s+\d{4}-\d{2}-\d{2}T/.test(trimmed) // RFC 5424
+  ) {
+    return 'syslog';
+  }
+
+  // Apache access/error log
+  if (
+    sampleType === 'apache' ||
+    /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\s+-\s+-\s+\[/.test(trimmed) || // Apache access
+    /\[client\s+\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(sample) // Apache error
+  ) {
+    return 'apache';
+  }
+
+  // Nginx access/error log
+  if (
+    /nginx|upstream/.test(lowerSample) &&
+    /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}.*"\w+\s+\/.*HTTP\/\d\.\d"/.test(sample)
+  ) {
+    return 'nginx';
+  }
+
+  // IIS log format
+  if (
+    /^#Software:|^#Version:|^#Date:/.test(trimmed) ||
+    /\s+\d{3}\s+\d+\s+\d+\s+\d+$/.test(sample) // IIS log pattern
+  ) {
+    return 'iis';
+  }
+
+  // Key-value pairs
+  if (sampleType === 'kv' || /\w+=[\w"'][^\s]*(\s+\w+=[\w"'][^\s]*){2,}/.test(sample)) {
+    return 'kv';
+  }
+
+  // Custom/unstructured
+  if (sampleType === 'unknown') {
+    return 'unknown';
+  }
+
+  return 'custom';
+}
+
+/**
+ * Generate appropriate sourcetype based on detected platform and format
+ * This ensures consistency between what we detect and what we configure
+ */
+function generateSourcetype(
+  platform: LogPlatform,
+  format: LogFormat,
+  vendor: string | null,
+  fallbackSourcetype: string | null
+): string {
+  // AWS platform
+  if (platform === 'aws') {
+    if (vendor?.toLowerCase().includes('cloudwatch')) return 'aws:cloudwatch';
+    if (vendor?.toLowerCase().includes('s3')) return 'aws:s3';
+    if (vendor?.toLowerCase().includes('cloudtrail')) return 'aws:cloudtrail';
+    if (vendor?.toLowerCase().includes('vpc')) return 'aws:cloudwatch:vpcflow';
+    if (format === 'json') return 'aws:cloudwatch';
+    return 'aws:log';
+  }
+
+  // Azure platform
+  if (platform === 'azure') {
+    if (vendor?.toLowerCase().includes('activity')) return 'azure:activity';
+    if (vendor?.toLowerCase().includes('diagnostic')) return 'azure:diagnostic';
+    if (format === 'json') return 'azure:log:json';
+    return 'azure:log';
+  }
+
+  // GCP platform
+  if (platform === 'gcp') {
+    if (vendor?.toLowerCase().includes('audit')) return 'gcp:audit';
+    if (vendor?.toLowerCase().includes('pubsub')) return 'gcp:pubsub';
+    if (format === 'json') return 'gcp:log:json';
+    return 'gcp:log';
+  }
+
+  // Docker platform
+  if (platform === 'docker') {
+    if (format === 'json') return 'docker:container:json';
+    return 'docker:container';
+  }
+
+  // Kubernetes platform
+  if (platform === 'kubernetes') {
+    if (format === 'json') return 'kube:container:json';
+    return 'kube:container';
+  }
+
+  // Windows platform
+  if (platform === 'windows') {
+    if (format === 'windows-evtx') return 'WinEventLog';
+    if (vendor?.toLowerCase().includes('security')) return 'WinEventLog:Security';
+    if (vendor?.toLowerCase().includes('system')) return 'WinEventLog:System';
+    if (vendor?.toLowerCase().includes('application')) return 'WinEventLog:Application';
+    return 'windows:log';
+  }
+
+  // Linux/Unix platform
+  if (platform === 'linux' || platform === 'unix') {
+    if (format === 'syslog') return 'syslog';
+    if (vendor?.toLowerCase().includes('auth')) return 'linux:auth';
+    if (vendor?.toLowerCase().includes('secure')) return 'linux:secure';
+    return 'linux:log';
+  }
+
+  // macOS platform
+  if (platform === 'macos') {
+    if (format === 'syslog') return 'macos:syslog';
+    return 'macos:log';
+  }
+
+  // Format-based sourcetypes (when platform is unknown or cloud/generic)
+  if (format === 'cef') return 'cef';
+  if (format === 'leef') return 'leef';
+  if (format === 'apache') return 'access_combined';
+  if (format === 'nginx') return 'nginx:access';
+  if (format === 'iis') return 'iis';
+  if (format === 'csv') return 'csv';
+  if (format === 'xml') return 'xml';
+  if (format === 'json' && platform === 'cloud') return 'cloud:json';
+  if (format === 'json') return 'json';
+
+  // Fallback to vendor-detected sourcetype or generic
+  return fallbackSourcetype || 'generic_log';
+}
+
+/**
+ * Determine the best Splunk input method based on platform and format
+ * Returns the input method and optional notes for special handling
+ */
+function determineSplunkInputMethod(
+  platform: LogPlatform,
+  format: LogFormat,
+  vendor: string | null
+): { method: SplunkInputMethod; notes?: string } {
+  // Cloud platforms typically use their specific collectors
+  if (platform === 'aws') {
+    if (format === 'json') {
+      return {
+        method: 'cloudwatch',
+        notes:
+          'For CloudWatch Logs, use the Splunk Add-on for AWS. For S3 logs, configure S3 inputs. For real-time streaming, consider Kinesis Firehose.',
+      };
+    }
+    return {
+      method: 's3',
+      notes: 'Use the Splunk Add-on for AWS to configure S3 inputs for archived logs.',
+    };
+  }
+
+  if (platform === 'azure') {
+    return {
+      method: 'azure-blob',
+      notes:
+        'Use the Splunk Add-on for Microsoft Cloud Services. Configure Azure Blob Storage inputs or Azure Event Hub for real-time streaming.',
+    };
+  }
+
+  if (platform === 'gcp') {
+    return {
+      method: 'gcp-pubsub',
+      notes:
+        'Use the Splunk Add-on for Google Cloud Platform. Configure Pub/Sub subscriptions or Cloud Storage buckets.',
+    };
+  }
+
+  // Windows-specific methods
+  if (platform === 'windows') {
+    if (format === 'windows-evtx') {
+      return {
+        method: 'wmi',
+        notes:
+          'For Windows Event Logs, use WMI inputs in inputs.conf. Consider using the Splunk Universal Forwarder on Windows hosts.',
+      };
+    }
+    if (format === 'json' || format === 'xml') {
+      return {
+        method: 'powershell',
+        notes:
+          'For structured data on Windows, consider using PowerShell scripted inputs or the Splunk HTTP Event Collector (HEC).',
+      };
+    }
+  }
+
+  // JSON and structured formats - HEC is often better
+  if (format === 'json' || format === 'xml') {
+    return {
+      method: 'hec',
+      notes:
+        '⚠️ For JSON/XML logs, consider using HTTP Event Collector (HEC) instead of file monitoring for better performance and structure preservation. Configure HEC endpoints in inputs.conf.',
+    };
+  }
+
+  // Docker/Kubernetes - typically use logging drivers or collectors
+  if (platform === 'docker' || platform === 'kubernetes') {
+    return {
+      method: 'hec',
+      notes:
+        'For container logs, use Docker logging driver or Kubernetes DaemonSet with HEC. Alternatively, use Splunk Connect for Kubernetes.',
+    };
+  }
+
+  // CEF/LEEF formats - often received via syslog
+  if (format === 'cef' || format === 'leef') {
+    return {
+      method: 'scripted',
+      notes:
+        'CEF/LEEF logs are often received via syslog. Configure syslog inputs or use monitor stanza if reading from files.',
+    };
+  }
+
+  // Default: standard file monitoring
+  return {
+    method: 'monitor',
   };
 }
 

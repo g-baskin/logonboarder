@@ -112,6 +112,148 @@
       "TRUNCATE": "999999",
       "category": "Docker Container Logs"
     },
+    "aws:cloudwatch": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%3NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "AWS CloudWatch Logs"
+    },
+    "aws:s3": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%3NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "AWS S3 Access Logs"
+    },
+    "aws:cloudtrail": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",
+      "TIME_PREFIX": "\"eventTime\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "30",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "AWS CloudTrail Logs"
+    },
+    "aws:log": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%3NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "AWS Logs (Generic)"
+    },
+    "azure:log": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%6NZ",
+      "TIME_PREFIX": "\"time\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "Azure Logs"
+    },
+    "azure:activity": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%6NZ",
+      "TIME_PREFIX": "\"eventTimestamp\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "Azure Activity Logs"
+    },
+    "gcp:log": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%6NZ",
+      "TIME_PREFIX": "\"timestamp\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "GCP Logs"
+    },
+    "gcp:audit": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%6NZ",
+      "TIME_PREFIX": "\"timestamp\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "GCP Audit Logs"
+    },
+    "kube:container": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%9NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Kubernetes Container Logs"
+    },
+    "kube:container:json": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%9NZ",
+      "TIME_PREFIX": "\"time\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "Kubernetes Container Logs (JSON)"
+    },
+    "docker:container": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%9NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Docker Container Logs"
+    },
+    "docker:container:json": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%9NZ",
+      "TIME_PREFIX": "\"time\"\\s*:\\s*\"",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "Docker Container Logs (JSON)"
+    },
+    "windows:log": {
+      "SHOULD_LINEMERGE": "true",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "25",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Windows Logs"
+    },
+    "linux:log": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%b %d %H:%M:%S",
+      "MAX_TIMESTAMP_LOOKAHEAD": "20",
+      "KV_MODE": "auto",
+      "TRUNCATE": "999999",
+      "category": "Linux Logs"
+    },
+    "json": {
+      "SHOULD_LINEMERGE": "false",
+      "LINE_BREAKER": "([\\r\\n]+)",
+      "TIME_FORMAT": "%Y-%m-%dT%H:%M:%S.%3NZ",
+      "MAX_TIMESTAMP_LOOKAHEAD": "35",
+      "KV_MODE": "json",
+      "TRUNCATE": "999999",
+      "category": "JSON Logs"
+    },
     "_default": {
       "SHOULD_LINEMERGE": "false",
       "LINE_BREAKER": "([\\r\\n]+)",

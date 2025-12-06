@@ -8,12 +8,39 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/FileUpload';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Download, FileCode, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Download, FileCode, AlertTriangle, X, HelpCircle } from 'lucide-react';
+import { trpc } from '@/trpc/client';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TAConfig {
   inputsConf?: string;
   propsConf?: string;
   transformsConf?: string;
+}
+
+interface TranslationBreakdown {
+  splunkConfig: string;
+  criblConfig: string;
+  configType: 'input' | 'prop' | 'transform';
+  criblComponentType: 'route' | 'pipeline' | 'function';
+  criblFunctionType?:
+    | 'auto_timestamp'
+    | 'regex_extract'
+    | 'parser'
+    | 'eval'
+    | 'mask'
+    | 'drop'
+    | 'grok'
+    | 'lookup'
+    | 'event_breaker';
+  criblFields?: string;
+  title: string;
+  what: string;
+  why: string;
+  how: string;
+  validation: string;
+  autoHandled?: string;
+  notTranslated?: string;
 }
 
 interface CriblPipeline {
@@ -22,12 +49,19 @@ interface CriblPipeline {
   functions: string;
   notes: string[];
   warnings: string[];
+  breakdown: TranslationBreakdown[];
 }
 
 export default function TATranslatorPage() {
   const [taConfig, setTaConfig] = useState<TAConfig>({});
   const [criblOutput, setCriblOutput] = useState<CriblPipeline | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
+
+  // tRPC mutation for translation
+  const translateMutation = trpc.taTranslator.translate.useMutation({
+    onSuccess: (data) => {
+      setCriblOutput(data);
+    },
+  });
 
   const handleFileUpload = (content: string, filename: string) => {
     // Determine which config file based on filename
@@ -41,63 +75,33 @@ export default function TATranslatorPage() {
     }
   };
 
-  const handleTranslate = async () => {
-    setIsTranslating(true);
+  const handleTranslate = () => {
+    translateMutation.mutate({
+      inputsConf: taConfig.inputsConf,
+      propsConf: taConfig.propsConf,
+      transformsConf: taConfig.transformsConf,
+    });
+  };
 
-    // TODO: Call API to translate Splunk TA → Cribl
-    // For now, just show a mock translation after 2 seconds
-    setTimeout(() => {
-      setCriblOutput({
-        routes: `# Cribl Routes Configuration
-# Translated from Splunk TA
+  const clearInputsConf = () => {
+    setTaConfig((prev) => ({ ...prev, inputsConf: undefined }));
+  };
 
-routes:
-  - id: splunk_ta_route
-    name: "Splunk TA Data Route"
-    filter: "true"
-    output: default
-    description: "Route for data from translated Splunk TA"
-`,
-        pipelines: `# Cribl Pipeline Configuration
-# Field extractions translated from props.conf/transforms.conf
+  const clearPropsConf = () => {
+    setTaConfig((prev) => ({ ...prev, propsConf: undefined }));
+  };
 
-pipelines:
-  - id: splunk_ta_pipeline
-    name: "Splunk TA Pipeline"
-    functions:
-      - id: extract_fields
-        filter: "true"
-        conf:
-          mode: "regex"
-          # Field extractions from props.conf REGEX/EXTRACT
-`,
-        functions: `# Cribl Functions
-# Translated from Splunk field extractions
+  const clearTransformsConf = () => {
+    setTaConfig((prev) => ({ ...prev, transformsConf: undefined }));
+  };
 
-functions:
-  - eval:
-      - name: "field1"
-        value: "C.extract(/regex_pattern/)"
-  - parser:
-      type: "regex"
-      regex: "/your_regex_here/"
-`,
-        notes: [
-          'Successfully translated inputs.conf → Cribl data sources',
-          'Converted props.conf TIME_FORMAT → Cribl timestamp extraction',
-          'Mapped transforms.conf REGEX → Cribl eval functions',
-        ],
-        warnings: [
-          'Review complex regex patterns for accuracy',
-          'Test field extractions with sample data before deploying',
-          'Some Splunk-specific features may not have direct Cribl equivalents',
-        ],
-      });
-      setIsTranslating(false);
-    }, 2000);
+  const clearAll = () => {
+    setTaConfig({});
+    setCriblOutput(null);
   };
 
   const hasAnyConfig = taConfig.inputsConf || taConfig.propsConf || taConfig.transformsConf;
+  const isDev = process.env.NODE_ENV === 'development';
 
   const downloadCriblConfig = () => {
     if (!criblOutput) return;
@@ -147,14 +151,56 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-3xl font-bold">Splunk TA → Cribl Translator</h1>
-          <Badge
-            variant="outline"
-            className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
-          >
-            BETA
-          </Badge>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">Splunk TA → Cribl Translator</h1>
+            <Badge
+              variant="outline"
+              className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
+            >
+              BETA
+            </Badge>
+            {isDev && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm">
+                    <div className="space-y-2 text-xs">
+                      <p className="font-semibold">How Translation Works:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>
+                          <strong>inputs.conf</strong> → Cribl <strong>routes.yml</strong> (data
+                          sources)
+                        </li>
+                        <li>
+                          <strong>props.conf</strong> → Cribl <strong>pipelines.yml</strong>{' '}
+                          (parsing rules)
+                        </li>
+                        <li>
+                          <strong>transforms.conf</strong> → Cribl <strong>functions.yml</strong>{' '}
+                          (field extractions)
+                        </li>
+                      </ul>
+                      <p className="text-muted-foreground italic pt-2">
+                        The translator parses Splunk INI-style configs and generates equivalent
+                        Cribl YAML configurations automatically.
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+          {hasAnyConfig && (
+            <Button variant="outline" size="sm" onClick={clearAll}>
+              <X className="mr-2 h-4 w-4" />
+              Clear All
+            </Button>
+          )}
         </div>
         <p className="text-muted-foreground">
           Migrate your Splunk Technical Add-ons to Cribl Stream pipelines automatically
@@ -174,14 +220,21 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
           <CardContent className="space-y-4">
             {/* inputs.conf */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                inputs.conf
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  inputs.conf
+                  {taConfig.inputsConf && (
+                    <Badge variant="secondary" className="text-xs">
+                      ✓ Loaded
+                    </Badge>
+                  )}
+                </Label>
                 {taConfig.inputsConf && (
-                  <Badge variant="secondary" className="text-xs">
-                    ✓ Loaded
-                  </Badge>
+                  <Button variant="ghost" size="sm" onClick={clearInputsConf} className="h-6 px-2">
+                    <X className="h-3 w-3" />
+                  </Button>
                 )}
-              </Label>
+              </div>
               <FileUpload
                 onFileRead={handleFileUpload}
                 acceptedTypes={['.conf', '.txt']}
@@ -199,14 +252,21 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
 
             {/* props.conf */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                props.conf
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  props.conf
+                  {taConfig.propsConf && (
+                    <Badge variant="secondary" className="text-xs">
+                      ✓ Loaded
+                    </Badge>
+                  )}
+                </Label>
                 {taConfig.propsConf && (
-                  <Badge variant="secondary" className="text-xs">
-                    ✓ Loaded
-                  </Badge>
+                  <Button variant="ghost" size="sm" onClick={clearPropsConf} className="h-6 px-2">
+                    <X className="h-3 w-3" />
+                  </Button>
                 )}
-              </Label>
+              </div>
               <FileUpload
                 onFileRead={handleFileUpload}
                 acceptedTypes={['.conf', '.txt']}
@@ -224,14 +284,26 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
 
             {/* transforms.conf */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                transforms.conf (optional)
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  transforms.conf (optional)
+                  {taConfig.transformsConf && (
+                    <Badge variant="secondary" className="text-xs">
+                      ✓ Loaded
+                    </Badge>
+                  )}
+                </Label>
                 {taConfig.transformsConf && (
-                  <Badge variant="secondary" className="text-xs">
-                    ✓ Loaded
-                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearTransformsConf}
+                    className="h-6 px-2"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                 )}
-              </Label>
+              </div>
               <FileUpload
                 onFileRead={handleFileUpload}
                 acceptedTypes={['.conf', '.txt']}
@@ -251,11 +323,11 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
 
             <Button
               onClick={handleTranslate}
-              disabled={!hasAnyConfig || isTranslating}
+              disabled={!hasAnyConfig || translateMutation.isPending}
               className="w-full"
               size="lg"
             >
-              {isTranslating ? (
+              {translateMutation.isPending ? (
                 'Translating...'
               ) : (
                 <>
@@ -348,6 +420,170 @@ ${criblOutput.warnings.map((w) => `# ⚠ ${w}`).join('\n')}
           </CardContent>
         </Card>
       </div>
+
+      {/* Translation Breakdown Section */}
+      {criblOutput && criblOutput.breakdown && criblOutput.breakdown.length > 0 && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Translation Breakdown</CardTitle>
+              <CardDescription>
+                Detailed explanation of each Splunk to Cribl translation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {criblOutput.breakdown.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4"
+                >
+                  {/* Title with badges */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
+                    <Badge
+                      variant="outline"
+                      className={
+                        item.configType === 'input'
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100'
+                          : item.configType === 'prop'
+                            ? 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100'
+                            : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100'
+                      }
+                    >
+                      {item.configType === 'input'
+                        ? 'Input'
+                        : item.configType === 'prop'
+                          ? 'Props'
+                          : 'Transform'}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-100"
+                    >
+                      Cribl{' '}
+                      {item.criblComponentType.charAt(0).toUpperCase() +
+                        item.criblComponentType.slice(1)}
+                    </Badge>
+                    {item.criblFunctionType && (
+                      <Badge
+                        variant="outline"
+                        className="bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-100"
+                      >
+                        {item.criblFunctionType.toUpperCase()} Function
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Side-by-side config comparison */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Splunk Config</Label>
+                      <Textarea
+                        value={item.splunkConfig}
+                        readOnly
+                        className="font-mono text-xs h-32 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Cribl Config</Label>
+                      <Textarea
+                        value={item.criblConfig}
+                        readOnly
+                        className="font-mono text-xs h-32 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Copy-pasteable Cribl Fields */}
+                  {item.criblFields && (
+                    <div className="bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">
+                          Copy-Pasteable Cribl{' '}
+                          {item.criblComponentType.charAt(0).toUpperCase() +
+                            item.criblComponentType.slice(1)}{' '}
+                          Fields
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            navigator.clipboard.writeText(item.criblFields!);
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                      <pre className="font-mono text-xs text-cyan-900 dark:text-cyan-100 whitespace-pre-wrap overflow-x-auto">
+                        {item.criblFields}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Explanation sections */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                          What is being done?
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{item.what}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                          Why is this done?
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{item.why}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">
+                          How is this done?
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{item.how}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                          Validation & Correctness
+                        </p>
+                        <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
+                          {item.validation}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Auto-Handled Settings Section */}
+                  {item.autoHandled && (
+                    <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">
+                        ✅ Auto-Handled Settings (No Action Required)
+                      </p>
+                      <p className="text-sm text-green-800 dark:text-green-200 whitespace-pre-wrap">
+                        {item.autoHandled}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Not Translated Section */}
+                  {item.notTranslated && (
+                    <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                        ⚠️ Requires Manual Configuration
+                      </p>
+                      <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
+                        {item.notTranslated}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

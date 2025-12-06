@@ -192,19 +192,48 @@ export const analyzeRouter = createTRPCRouter({
       // Step 2: Scan for sensitive data
       const sensitiveFindings = input.runSensitiveScan ? scanPathsForSensitiveData(paths) : [];
 
-      // Step 3: Generate config for selected SIEM (with optional sample analysis)
-      const generatedConfig = generateConfigForSIEM(
+      // Step 3: Generate configs for ALL SIEMs (for multi-SIEM support)
+      const allSiems: SIEM[] = ['splunk', 'elastic', 'sentinel', 'qradar', 'cribl'];
+
+      // Generate config for the primary (selected) SIEM first
+      const primaryConfig = generateConfigForSIEM(
         pathAnalysis,
         input.siem as SIEM,
         sensitiveFindings,
         input.sampleAnalysis
       );
 
+      // Generate configs for all other SIEMs and add them to the primary config
+      for (const siem of allSiems) {
+        if (siem !== input.siem) {
+          const siemConfig = generateConfigForSIEM(
+            pathAnalysis,
+            siem,
+            sensitiveFindings,
+            input.sampleAnalysis
+          );
+
+          // Add the SIEM-specific config to the primary config
+          if (siem === 'elastic' && siemConfig.elastic) {
+            primaryConfig.elastic = siemConfig.elastic;
+          } else if (siem === 'sentinel' && siemConfig.sentinel) {
+            primaryConfig.sentinel = siemConfig.sentinel;
+          } else if (siem === 'qradar' && siemConfig.qradar) {
+            primaryConfig.qradar = siemConfig.qradar;
+          } else if (siem === 'cribl' && siemConfig.cribl) {
+            primaryConfig.cribl = siemConfig.cribl;
+          }
+        }
+      }
+
+      // Set the primary SIEM marker
+      primaryConfig.siem = input.siem as SIEM;
+
       return {
         success: true,
         pathAnalysis,
         sensitiveFindings,
-        generatedConfig,
+        generatedConfig: primaryConfig,
       };
     }),
 

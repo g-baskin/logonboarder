@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/FileUpload';
 import type {
   AnalyzeResponse,
+  GeneratedConfig,
   PathAnalysisResult,
   SensitiveFinding,
   SIEM,
@@ -149,6 +150,7 @@ interface LogSampleAnalysis {
 export default function AnalyzePage() {
   const [pathsText, setPathsText] = useState('');
   const [selectedSiem, setSelectedSiem] = useState<SIEM>('splunk');
+  const [viewSiem, setViewSiem] = useState<SIEM>('splunk'); // For switching between SIEM configs in results
   const [runSensitiveScan, setRunSensitiveScan] = useState(true);
   const [outputFormat, setOutputFormat] = useState<'zip' | 'txt'>('zip');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -158,6 +160,7 @@ export default function AnalyzePage() {
   const analyzeMutation = trpc.analyze.analyzeText.useMutation({
     onSuccess: (data) => {
       setResult(data);
+      setViewSiem(selectedSiem); // Set view SIEM to the primary/selected SIEM
     },
   });
 
@@ -565,6 +568,33 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
                 ? `${result.pathAnalysis.length} path(s) analyzed`
                 : 'Results will appear here'}
             </CardDescription>
+            {result && (
+              <div className="mt-4">
+                <Label className="text-sm font-medium mb-2 block">View Configuration For:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {SIEM_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={viewSiem === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewSiem(option.value)}
+                      className={`text-xs ${
+                        result.generatedConfig.siem === option.value
+                          ? 'ring-2 ring-blue-500 ring-offset-2'
+                          : ''
+                      }`}
+                    >
+                      {option.label}
+                      {result.generatedConfig.siem === option.value && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0">
+                          PRIMARY
+                        </Badge>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {result ? (
@@ -575,13 +605,13 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
                       Paths
                     </TabsTrigger>
                     <TabsTrigger value="config1" className="flex-shrink-0">
-                      {getConfigLabel(selectedSiem, 1)}
+                      {getConfigLabel(viewSiem, 1)}
                     </TabsTrigger>
                     <TabsTrigger value="config2" className="flex-shrink-0">
-                      {getConfigLabel(selectedSiem, 2)}
+                      {getConfigLabel(viewSiem, 2)}
                     </TabsTrigger>
                     <TabsTrigger value="config3" className="flex-shrink-0">
-                      {getConfigLabel(selectedSiem, 3)}
+                      {getConfigLabel(viewSiem, 3)}
                     </TabsTrigger>
                     {sampleAnalysis && sampleAnalysis.extractedFields.length > 0 && (
                       <TabsTrigger value="fields" className="flex-shrink-0">
@@ -603,22 +633,22 @@ C:\\Windows\\System32\\winevt\\Logs\\Security.evtx
 
                 <TabsContent value="config1" className="mt-4">
                   <ConfigPreview
-                    content={result.generatedConfig.inputsConf}
-                    deployInfo={getDeploymentInfo(selectedSiem, 0)}
+                    content={getConfigContent(result.generatedConfig, viewSiem, 0)}
+                    deployInfo={getDeploymentInfo(viewSiem, 0)}
                   />
                 </TabsContent>
 
                 <TabsContent value="config2" className="mt-4">
                   <ConfigPreview
-                    content={result.generatedConfig.propsConf}
-                    deployInfo={getDeploymentInfo(selectedSiem, 1)}
+                    content={getConfigContent(result.generatedConfig, viewSiem, 1)}
+                    deployInfo={getDeploymentInfo(viewSiem, 1)}
                   />
                 </TabsContent>
 
                 <TabsContent value="config3" className="mt-4">
                   <ConfigPreview
-                    content={result.generatedConfig.transformsConf}
-                    deployInfo={getDeploymentInfo(selectedSiem, 2)}
+                    content={getConfigContent(result.generatedConfig, viewSiem, 2)}
+                    deployInfo={getDeploymentInfo(viewSiem, 2)}
                   />
                 </TabsContent>
 
@@ -1230,4 +1260,42 @@ function getDefaultInputMethod(siem: SIEM): string {
     cribl: 'file-monitor',
   };
   return defaults[siem];
+}
+
+// Helper function to get config content for a specific SIEM and config index
+function getConfigContent(config: GeneratedConfig, siem: SIEM, index: 0 | 1 | 2): string {
+  if (siem === 'splunk') {
+    return index === 0 ? config.inputsConf : index === 1 ? config.propsConf : config.transformsConf;
+  } else if (siem === 'elastic' && config.elastic) {
+    return index === 0
+      ? config.elastic.filebeatYml
+      : index === 1
+        ? config.elastic.ingestPipeline
+        : config.elastic.logstashConf;
+  } else if (siem === 'sentinel' && config.sentinel) {
+    return index === 0
+      ? config.sentinel.dataCollectionRule
+      : index === 1
+        ? config.sentinel.analyticsRules
+        : config.sentinel.workbook;
+  } else if (siem === 'qradar' && config.qradar) {
+    return index === 0
+      ? config.qradar.logSourceExtension
+      : index === 1
+        ? config.qradar.dsmConfig
+        : config.qradar.logSourceExtension; // QRadar only has 2 configs, repeat first for index 2
+  } else if (siem === 'cribl' && config.cribl) {
+    return index === 0
+      ? config.cribl.routes
+      : index === 1
+        ? config.cribl.pipelines
+        : config.cribl.packs;
+  }
+
+  // Fallback to Splunk configs
+  return index === 0
+    ? config.inputsConf || 'Config not available'
+    : index === 1
+      ? config.propsConf || 'Config not available'
+      : config.transformsConf || 'Config not available';
 }
